@@ -1,5 +1,6 @@
 import Link from "next/link";
 import BriefView from "../components/BriefView";
+import SubscribeForm from "../components/SubscribeForm";
 import { getBrief, listBriefs } from "../lib/queries";
 
 export const revalidate = 300;
@@ -53,6 +54,8 @@ export default async function Home() {
           </ul>
         </section>
       ) : null}
+
+      <SubscribeForm />
     </>
   );
 }
