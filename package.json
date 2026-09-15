@@ -13,7 +13,8 @@
     "db:push": "drizzle-kit push",
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "fetch:market": "python scripts/fetch_market.py"
+    "fetch:market": "python scripts/fetch_market.py",
+    "verify": "tsx scripts/verify.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "latest",
