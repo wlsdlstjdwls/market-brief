@@ -30,6 +30,36 @@
 | `scripts/fetch_market.py` | 실제 시세 수집 → `data/market/{날짜}.json` |
 | `scripts/ingest.ts` | 적재 CLI |
 | `scripts/verify.ts` | 발행 결과 검증 (DB / 저장한 HTML) |
+| `scripts/update_web.bat` | 일일 갱신 (수집 → 적재 → 검증). 작업 스케줄러가 부른다 |
+| `scripts/install_update_web_task.bat` | 위 작업을 평일 16:10에 등록 |
+| `scripts/backfill.py` | 과거 회차 일괄 적재 |
+
+배치 파일은 ASCII로만 쓴다. cmd.exe가 한글 배치 텍스트를 깨뜨려 실행 자체가 실패한다
+(기존 `../*.bat`들도 전부 영문인 이유다). 설명은 이 문서에 쓴다.
+
+### 시세 데이터 소스 (2026-09-15 교체)
+
+KRX(data.krx.co.kr)가 이 PC의 IP를 차단한다. 응답이 JSON이 아니라 ip-block-page HTML이라
+`Expecting value: line 13 column 1`로 죽는다. pykrx도 같은 엔드포인트를 쓰므로 같이 실패한다.
+그래서 pykrx 경로를 걷어내고 아래로 갈아탔다. KRX가 다시 열리면 수급·업종은 KRX가 더 정확하다.
+
+| 항목 | 소스 | 과거 조회 |
+|---|---|---|
+| 지수 8종, 환율·유가·금·달러인덱스·VIX | FinanceDataReader | 가능 |
+| 미 국채 10년·2년물 | FinanceDataReader `FRED:DGS10` / `DGS2` | 가능 |
+| 국고채 3년물 | 네이버 시장지표 `IRR_GOVT03Y` | 가능 |
+| 투자주체별 순매수 | 네이버 `investorDealTrendDay` (억원) | 가능 |
+| 업종 등락률 | 네이버 `m.stock.naver.com/api/stocks/industry` | **불가** |
+
+업종 API에는 날짜 파라미터가 없다. 언제 불러도 "지금" 값이다. 그래서 ① 요청일이 오늘이고
+② 15:40을 넘겼고 ③ 그날 수급이 집계됐을 때만 그날 값으로 인정하고, 아니면 통째로 비운다.
+장중에 돌리면 장중 등락률이 그날 종가로 둔갑하기 때문이다. 과거 회차에 업종이 비어 있는 건
+이 이유이고, 정상이다.
+
+네이버 업종(79개 GICS 분류)을 `registry.ts`의 `SECTORS` 코드로 묶을 때는 소속 종목 수로
+가중평균한다. 시총 가중이 맞지만 API가 시총을 주지 않는다. 근사치다.
+`SEMI_EQP`·`ROBOT`·`SOLAR`는 대응하는 네이버 분류가 없어 항상 빈다.
+`SOX`(필라델피아 반도체)도 어느 소스에서도 안 받아진다.
 
 ### 차단 4중 방어
 
@@ -49,13 +79,29 @@ npm run typecheck
 npm run guard -- <파일|폴더>  # 원본에 어떤 종목 표기가 있는지
 npm run ingest -- --dry-run  # DB 없이 적재 결과 미리보기
 npm run verify               # DB의 published 브리핑 검사
+
+python scripts/fetch_market.py 2026-09-14   # 시세 수집 (장 마감 후)
+python scripts/backfill.py --dry-run        # 과거 회차 대상 날짜만 확인
+python scripts/backfill.py --publish --skip-existing
+scripts\update_web.bat 2026-09-14           # 일일 갱신 전체를 손으로 한 번
 ```
 
 DB를 쓰는 스크립트는 `.env.local`을 먼저 로드해야 한다.
 
 ```bash
-set -a && . ./.env.local && set +a && npx tsx scripts/ingest.ts --date 2026-09-08 --publish
+npx tsx --env-file=.env.local scripts/ingest.ts --date 2026-09-08 --publish
 ```
+
+## 일일 자동 실행
+
+작업 스케줄러 `MarketBrief-Update` — 평일 16:10 → `scripts/update_web.bat`.
+등록: `scripts\install_update_web_task.bat` (다시 돌리면 덮어쓴다).
+로그: `data/logs/update_web.log`.
+
+16:10인 이유는 장 마감 15:30 + 업종 스냅샷 인정 시각 15:40 이후이고,
+상위 저장소의 `SimpleStock-Report-PM`(16:00)과 겹치지 않아서다. 더 앞으로 당기지 말 것.
+
+**배포는 하지 않는다.** 페이지가 `revalidate = 300`이라 적재만 하면 5분 안에 사이트에 뜬다.
 
 ## 배포
 
@@ -74,27 +120,26 @@ vercel deploy --prod
 - 저장소: https://github.com/wlsdlstjdwls/market-brief (private)
 - Neon: Vercel Marketplace 연동, 무료 플랜, sin1 리전. `DATABASE_URL` 자동 주입
 - 스키마 적용 완료, 금칙어 5,765건 시드 완료
-- 발행된 브리핑 1건: 2026-09-08
-- 검증: 공개 페이지 본문 0건, DB 0건, 구조화 라벨 11개 전부 레지스트리 소속
+- 발행된 브리핑: 2026-06-22 ~ 2026-09-08 거래일 44회차 (backfill.py로 일괄 적재)
+- 수급·금리 채워짐. 업종은 과거 회차에서 빈다(위 "시세 데이터 소스" 참고)
+- 자동 실행: 작업 스케줄러 `MarketBrief-Update` 평일 16:10
 
 ## 막힌 것
 
-**투자주체별 수급과 KRX 업종지수를 못 가져온다.** pykrx의 KRX 로그인이 JSON이 아닌 응답을
-받아 실패한다(`Expecting value: line 13 column 1`). 화면에는 "아직 수집되지 않았습니다"로
-뜬다. 틀린 숫자를 채우지 말 것.
+**원본 리포트가 2026-09-08에서 끊겨 있다.** `../요약/뉴스/`에 09-09 이후 폴더가 없다.
+상위 저장소의 아침 뉴스 파이프라인 쪽 문제이고 여기서 고칠 일이 아니다(상위 저장소 수정 금지).
+그게 안 돌면 16:10 자동 실행은 매일 "원본 없음"으로 exit 2가 난다.
 
-대체 소스 후보: 네이버 금융 스크래핑, KRX 정보데이터시스템 OpenAPI, 한국투자증권 API.
-업종지수는 `registry.ts`의 `SECTORS` 코드에 매핑해야 한다.
+**업종 과거값을 받을 방법이 없다.** 네이버 업종 API에 날짜가 없고 KRX는 IP가 막혔다.
+KRX가 풀리거나 다른 소스를 찾기 전까지 과거 회차의 업종은 비워 둔다. 추정값 금지.
 
-미 국채 10년물·2년물 금리도 비어 있다. FinanceDataReader에서 안 받아진다.
+**`SOX`(필라델피아 반도체)** 가 FinanceDataReader·야후 어디서도 안 받아진다.
 
 ## 다음 할 일
 
-1. 수급·업종지수 대체 소스 연결
-2. 일일 자동 실행 등록 (`scripts/update_web.bat`, 작업 스케줄러, 장마감 후 16:10 권장)
-3. 과거 회차 일괄 적재 (`--date`를 돌면서)
-4. 이메일 구독 폼. `subscriber` 테이블은 이미 있고 화면·API는 없음
-5. 유료 전환 시 사업자등록 + 통신판매업 신고 + 개인정보처리방침 필요.
+1. 이메일 구독 폼. `subscriber` 테이블은 이미 있고 화면·API는 없음
+2. 업종 과거값 소스 재탐색 (KRX 차단 해제 여부 주기 확인)
+3. 유료 전환 시 사업자등록 + 통신판매업 신고 + 개인정보처리방침 필요.
    종목을 안 넣는 한 유사투자자문업 신고는 해당 없음
 
 ## 하지 말 것

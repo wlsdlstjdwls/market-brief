@@ -3,7 +3,7 @@
  *
  * 설계 원칙: 개별 종목을 담을 수 있는 컬럼을 어떤 테이블에도 만들지 않는다.
  * ticker / stock_name / symbol / isin 같은 컬럼은 존재하지 않으며, 추가해서도 안 된다.
- * 섹터 근거 수치는 개별 종목이 아니라 KRX 업종지수(sectorIndex)만 사용한다.
+ * 섹터 근거 수치는 개별 종목이 아니라 업종 등락률(sectorIndex)만 사용한다.
  */
 
 import {
@@ -91,7 +91,12 @@ export const investorFlow = pgTable(
   (t) => [index("investor_flow_brief_idx").on(t.briefId)]
 );
 
-/** KRX 업종지수 기반 섹터 강약. 개별 종목을 대체하는 유일한 근거 수치. */
+/**
+ * 업종 강약. 개별 종목을 대체하는 유일한 근거 수치.
+ * 컬럼명 krxSectorCode는 KRX 업종지수를 쓰던 때 붙인 이름이다. 지금 값은 네이버 업종
+ * 등락률을 registry SECTORS 코드로 묶은 것이다(scripts/fetch_market.py 참고).
+ * 이름만 남겨 둔 이유는 컬럼 개명이 얻는 것보다 잃는 게 커서다.
+ */
 export const sectorIndex = pgTable(
   "sector_index",
   {

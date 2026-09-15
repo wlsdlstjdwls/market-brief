@@ -37,10 +37,25 @@ function findRun(date?: string): { dir: string; tradeDate: string; runId: string
   dayDirs.sort();
   const dayDir = date ? dayDirs.find((d) => d.endsWith(date)) : dayDirs[dayDirs.length - 1];
   if (!dayDir) throw new Error(`${date} 회차가 없습니다.`);
+  const tradeDate = basename(dayDir);
   const runs = readdirSync(dayDir).filter((e) => /^run-/.test(e)).sort();
-  if (!runs.length) throw new Error(`${dayDir}에 run-* 폴더가 없습니다.`);
+
+  // run-* 폴더 없이 원본이 날짜 폴더에 바로 놓인 회차가 있다(2026-09-07 등).
+  // 그런 날도 적재할 수 있게 날짜 폴더 자체를 회차로 본다.
+  if (!runs.length) {
+    return { dir: dayDir, tradeDate, runId: "run-none" };
+  }
+
   const runId = runs[runs.length - 1];
-  return { dir: join(dayDir, runId), tradeDate: basename(dayDir), runId };
+  // 회차 번호는 HHMM이다. 장 마감(15:30) 전 회차는 그날 종가를 아직 모르는 글이라
+  // fetch_market.py가 받아 둔 그날 종가와 어긋날 수 있다.
+  const hhmm = Number(runId.replace(/\D/g, ""));
+  if (Number.isFinite(hhmm) && hhmm < 1530) {
+    console.warn(
+      `  ! ${runId}은 장 마감 전 회차입니다. 본문이 ${tradeDate} 종가를 반영하지 않을 수 있습니다.`
+    );
+  }
+  return { dir: join(dayDir, runId), tradeDate, runId };
 }
 
 function readSources(dir: string): Record<string, string> {

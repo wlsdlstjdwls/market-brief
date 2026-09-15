@@ -38,7 +38,7 @@ export const MACROS: MacroDef[] = [
   { key: "VIX",    name: "VIX 변동성지수",      kind: "volatility", unit: "pt", match: ["vix"], order: 10 },
 ];
 
-/** KRX 업종지수 기준 섹터. 개별 종목을 대체하는 유일한 근거 단위. */
+/** 업종 기준 섹터. 개별 종목을 대체하는 유일한 근거 단위. */
 export const SECTORS: SectorDef[] = [
   { code: "SEMI",      name: "반도체",        match: ["반도체", "메모리"] },
   { code: "SEMI_EQP",  name: "반도체 장비·소재", match: ["반도체 장비", "소부장", "장비·소재"] },

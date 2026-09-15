@@ -194,7 +194,7 @@ export default function BriefView({
         )}
       </Section>
 
-      <Section title="업종 강약 (KRX 업종지수)">
+      <Section title="업종 강약">
         {sectors.length ? (
           <ul className="space-y-1.5">
             {sectors.map((s) => {
@@ -229,7 +229,7 @@ export default function BriefView({
             })}
           </ul>
         ) : (
-          <Empty what="업종지수" />
+          <Empty what="업종" />
         )}
       </Section>
 
