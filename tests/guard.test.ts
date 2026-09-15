@@ -118,6 +118,7 @@ test("종목이 든 섹션과 문단은 페이로드에서 빠진다", () => {
 test("레지스트리에 없는 라벨은 거부한다", () => {
   const bad = {
     tradeDate: "2026-09-08",
+    session: "pm" as const,
     runId: "run-1",
     headline: "",
     summary: "",

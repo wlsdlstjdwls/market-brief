@@ -30,6 +30,7 @@
 | `src/lib/persist.ts` | Neon 적재. 적재 직전 재검사 + 감사 로그 |
 | `src/db/schema.ts` | Drizzle 스키마 8테이블 |
 | `scripts/add-brief-topic.ts` | `brief_topic` 테이블 추가 SQL (1회성, 아무것도 지우지 않음) |
+| `scripts/add-session.ts` | `daily_brief.session` 추가 + 유니크 키 교체 (1회성, 2026-09-15 적용 완료) |
 | `scripts/fetch_market.py` | 실제 시세 수집 → `data/market/{날짜}.json` |
 | `scripts/ingest.ts` | 적재 CLI |
 | `scripts/verify.ts` | 발행 결과 검증 (DB / 저장한 HTML) |
@@ -64,6 +65,31 @@ KRX(data.krx.co.kr)가 이 PC의 IP를 차단한다. 응답이 JSON이 아니라
 `SEMI_EQP`·`ROBOT`·`SOLAR`는 대응하는 네이버 분류가 없어 항상 빈다.
 `SOX`(필라델피아 반도체)도 어느 소스에서도 안 받아진다.
 
+### 하루 두 회차 (2026-09-15 도입)
+
+원본 루틴이 하루 두 번 쓴다. 두 판은 자리가 다르고, 겹치는 글이 아니라 다른 글이다.
+
+| 회차 | 원본 위치 | 작성 시각 | 내용 |
+|---|---|---|---|
+| `am` 프리마켓 | 날짜 폴더 **루트** | 07:4x | 전일 미국장 + 오늘 전망 |
+| `pm` 마감 종합 | `run-HHMM/` | 15:3x | 당일 종가 확정 |
+
+여태 `pm`만 적재됐다. `ingest.ts`가 run-* 중 최신 하나만 골랐기 때문이고,
+그래서 오전판은 한 번도 화면에 뜬 적이 없었다. 지금은 둘 다 적재한다.
+
+- DB 유니크 키는 `(trade_date, session)`이다. 날짜 하나에 행이 둘일 수 있다.
+- 회차 판정은 `sessionOf()` — ① 원문의 `작성 기준시각` ② 폴더명 HHMM ③ 폴더 구조.
+  2026-08-26 이전 회차에는 기준시각 줄이 없어서 ③으로 간다
+  (`run-HHMM/`이 따로 있으면 루트에 남은 쪽이 오전판).
+- **오전판에는 시세를 붙이지 않는다.** 장이 열리기 전 글이라 그날 종가가 없다.
+  `readMarket()`이 `am`이면 빈 값을 돌려준다. 화면이 뉴스만 싣기 때문에 티가 나지 않는다.
+- 화면은 날짜 페이지 안의 **탭**이다. `/brief/{날짜}`가 마감 종합, `?s=am`이 프리마켓.
+  회차가 하나뿐인 날은 탭을 그리지 않는다.
+- **홈은 `?s=am`을 받지 않는다.** `searchParams`를 읽으면 매 요청 서버 렌더가 되어
+  `revalidate=300`이 무시된다. 홈·아카이브는 정적으로 두고 탭은 날짜 페이지로 보낸다.
+- 아카이브와 "지난 브리핑" 목록은 날짜당 한 줄이다(마감 종합 우선). 탭이 안에 있으니
+  목록까지 두 줄로 늘릴 이유가 없다.
+
 ### 차단 4중 방어
 
 1. 파일 — `종목뉴스.md` 투입 거부 (`assertAllowedSource`)
@@ -82,6 +108,8 @@ npm run typecheck
 npm run guard -- <파일|폴더>  # 원본에 어떤 종목 표기가 있는지
 npm run ingest -- --dry-run  # DB 없이 적재 결과 미리보기
 npm run verify               # DB의 published 브리핑 검사
+
+npm run ingest -- --date 2026-09-08 --session am --dry-run   # 오전판만 미리보기
 
 python scripts/fetch_market.py 2026-09-14   # 시세 수집 (장 마감 후)
 python scripts/backfill.py --dry-run        # 과거 회차 대상 날짜만 확인
@@ -102,13 +130,21 @@ npx tsx --env-file=.env.local scripts/ingest.ts --date 2026-09-08 --publish
 | | GitHub Actions (권장) | 로컬 작업 스케줄러 |
 |---|---|---|
 | 정의 | `.github/workflows/daily-update.yml` | `MarketBrief-Update` → `scripts/update_web.bat` |
-| 시각 | 평일 16:10 KST (`cron: 10 7 * * 1-5`, UTC) | 평일 16:10 |
+| 시각 | 평일 08:10·16:40 KST (회차별 2회) | 평일 16:10 |
 | PC 전원 | 무관 | **켜져 있고 로그인돼 있어야 함** (`Logon Mode: Interactive only`) |
 | 로그 | Actions 탭 + Step Summary | `data/logs/update_web.log` |
 
-16:10인 이유는 장 마감 15:30 + 업종 스냅샷 인정 시각 15:40 이후이고,
-상위 저장소의 `SimpleStock-Report-PM`(16:00)과 겹치지 않아서다. 더 앞으로 당기지 말 것.
+회차마다 한 번씩 돈다. 원본이 나온 뒤에 받아 가야 하기 때문이다.
+
+- **08:10 KST** (`cron: 10 23 * * 0-4`, UTC 일~목) — 프리마켓판(원본 07:4x). 시세는 받지 않는다.
+- **16:40 KST** (`cron: 40 7 * * 1-5`) — 마감 종합판(원본 15:3x).
+
+16:40인 이유는 오후 원고의 **커밋 시각이 15:53~16:18**로 퍼져 있어서다. 16:10으로 잡으면
+2026-08-10 같은 날(16:18 커밋)을 놓친다. 장 마감 15:30 + 업종 스냅샷 인정 시각 15:40 이후이고,
+상위 저장소의 `SimpleStock-Report-PM`(16:00)과도 겹치지 않는다. 더 앞으로 당기지 말 것.
 Actions 스케줄은 수 분 지연될 수 있는데, 늦는 방향이라 15:40 제약과는 충돌하지 않는다.
+
+수동 실행(`workflow_dispatch`)은 날짜와 회차를 골라 넣을 수 있다. 회차를 비우면 그날 있는 것을 전부 적재한다.
 
 **배포는 하지 않는다.** 페이지가 `revalidate = 300`이라 적재만 하면 5분 안에 사이트에 뜬다.
 

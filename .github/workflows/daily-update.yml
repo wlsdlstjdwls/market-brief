@@ -14,15 +14,27 @@ name: daily-update
 
 on:
   schedule:
-    # 16:10 KST = 07:10 UTC. 평일만.
-    # 장 마감 15:30 + 업종 스냅샷 인정 시각 15:40 이후여야 한다. 앞으로 당기지 말 것.
-    - cron: "10 7 * * 1-5"
+    # 원본 루틴이 하루 두 번 쓴다. 각 판이 나온 뒤에 한 번씩 받아 간다.
+    #
+    # 08:10 KST = 23:10 UTC 전날 → UTC 일~목이 KST 월~금이다.
+    #   프리마켓판(원본 07:4x)을 받는다. 장 전이라 시세는 받지 않는다.
+    - cron: "10 23 * * 0-4"
+    # 16:40 KST = 07:40 UTC. 평일.
+    #   마감 종합판(원본 15:3x, 커밋은 15:53~16:18)을 받는다.
+    #   장 마감 15:30 + 업종 스냅샷 인정 시각 15:40 이후여야 한다. 앞으로 당기지 말 것.
+    - cron: "40 7 * * 1-5"
   workflow_dispatch:
     inputs:
       trade_date:
         description: "대상 일자 YYYY-MM-DD (비우면 오늘 KST)"
         required: false
         type: string
+      session:
+        description: "회차 (비우면 그날 있는 회차를 전부)"
+        required: false
+        type: choice
+        options: ["", "am", "pm"]
+        default: ""
 
 # 스케줄과 수동 실행이 겹쳐도 한 번에 하나만 돈다.
 concurrency:
@@ -54,13 +66,31 @@ jobs:
           sparse-checkout: 요약/뉴스
           sparse-checkout-cone-mode: false
 
-      - name: 대상 일자 결정
+      - name: 대상 일자·회차 결정
         id: date
+        env:
+          # 아침 스케줄이면 프리마켓판만, 저녁 스케줄이면 마감판만.
+          # 수동 실행은 입력을 따르고, 비우면 그날 있는 회차를 전부 적재한다.
+          CRON: ${{ github.event.schedule }}
+          INPUT_SESSION: ${{ inputs.session }}
         run: |
           D="${{ inputs.trade_date }}"
           [ -z "$D" ] && D=$(date +%F)
           echo "trade_date=$D" >> "$GITHUB_OUTPUT"
-          echo "대상 일자: $D (KST $(date +%F' '%H:%M))"
+
+          S="$INPUT_SESSION"
+          if [ -z "$S" ] && [ -n "$CRON" ]; then
+            case "$CRON" in
+              "10 23 "*) S=am ;;
+              *) S=pm ;;
+            esac
+          fi
+          echo "session=$S" >> "$GITHUB_OUTPUT"
+
+          # 프리마켓판은 장이 열리기 전 글이라 그날 시세가 없다. 수집을 건너뛴다.
+          if [ "$S" = "am" ]; then echo "fetch=false" >> "$GITHUB_OUTPUT"; else echo "fetch=true" >> "$GITHUB_OUTPUT"; fi
+
+          echo "대상 일자: $D / 회차: ${S:-전부} (KST $(date +%F' '%H:%M))"
 
       - name: 원고 존재 확인
         id: source
@@ -76,7 +106,7 @@ jobs:
             echo "found=true" >> "$GITHUB_OUTPUT"
             echo "원고: $DIR"
             ls -1 "$DIR"
-            echo "### $D — 적재 시도" >> "$GITHUB_STEP_SUMMARY"
+            echo "### $D ${{ steps.date.outputs.session }} — 적재 시도" >> "$GITHUB_STEP_SUMMARY"
             echo "원고 \`${DIR#$GITHUB_WORKSPACE/}\`" >> "$GITHUB_STEP_SUMMARY"
           fi
 
@@ -101,12 +131,16 @@ jobs:
           npm ci --no-audit --no-fund || npm install --no-audit --no-fund
 
       - name: 1/3 시세 수집
-        if: steps.source.outputs.found == 'true'
+        if: steps.source.outputs.found == 'true' && steps.date.outputs.fetch == 'true'
         run: python scripts/fetch_market.py "${{ steps.date.outputs.trade_date }}"
 
       - name: 2/3 적재
         if: steps.source.outputs.found == 'true'
-        run: npx tsx scripts/ingest.ts --date "${{ steps.date.outputs.trade_date }}" --publish
+        env:
+          SESSION: ${{ steps.date.outputs.session }}
+        run: |
+          # SESSION이 비면 그날 있는 회차를 전부 적재한다(ingest 기본 동작).
+          npx tsx scripts/ingest.ts             --date "${{ steps.date.outputs.trade_date }}"             ${SESSION:+--session "$SESSION"}             --publish
 
       - name: 3/3 검증
         if: steps.source.outputs.found == 'true'

@@ -38,8 +38,12 @@ export interface DroppedBlock {
   sample: string;
 }
 
+export type BriefSession = "am" | "pm";
+
 export interface BriefPayload {
   tradeDate: string;
+  /** am = 프리마켓(07:4x), pm = 마감 종합(15:3x). 같은 날짜에 둘 다 있을 수 있다. */
+  session: BriefSession;
   runId: string;
   headline: string;
   summary: string;
@@ -186,7 +190,8 @@ export function buildPayload(
   files: Record<string, string>,
   tradeDate: string,
   runId: string,
-  market: MarketData = { tradeDate }
+  market: MarketData = { tradeDate },
+  session: BriefSession = "pm"
 ): BriefPayload {
   for (const name of Object.keys(files)) assertAllowedSource(name);
 
@@ -229,6 +234,7 @@ export function buildPayload(
 
   const payload: BriefPayload = {
     tradeDate,
+    session,
     runId,
     headline,
     summary: leadText || krParas[0] || macroParas[0] || "",

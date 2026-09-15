@@ -1,15 +1,22 @@
 import Link from "next/link";
 import { renderMarkdown, renderText } from "../lib/render";
+import { SESSION_LABEL, SESSION_ORDER, type Session } from "../lib/queries";
 import SectionRail from "./SectionRail";
 import Shell from "./Shell";
 
 interface Props {
   brief: {
     tradeDate: string;
+    session: Session;
+    runId: string;
     headline: string;
     macroCommentary: string;
     marketSummary: string;
   };
+  /** 그날 발행된 회차. 둘이면 탭이 나온다. 하나면 탭을 그리지 않는다. */
+  sessions?: Session[];
+  /** 탭 링크의 뿌리. 홈이면 "/", 날짜 페이지면 "/brief/{날짜}". */
+  basePath?: string;
   topics?: Array<{
     kind: string;
     rank: number;
@@ -25,6 +32,47 @@ const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
 function weekday(date: string) {
   const d = new Date(`${date}T00:00:00+09:00`);
   return Number.isNaN(d.getTime()) ? null : WEEKDAY[d.getDay()];
+}
+
+/**
+ * run-1535 → "15:35". 회차 식별자에 시각이 박혀 있는 경우에만 쓴다.
+ * 프리마켓판은 폴더에 시각이 없어(run-none) 표기를 생략한다.
+ */
+function runTime(runId: string) {
+  const m = runId.match(/(\d{2})(\d{2})$/);
+  return m ? `${m[1]}:${m[2]}` : null;
+}
+
+/**
+ * 회차 탭. 원본 루틴이 하루 두 번 쓰기 때문에 한 날짜에 글이 둘이다.
+ * 링크만 쓰므로 클라이언트 자바스크립트가 필요 없다.
+ */
+function SessionTabs({
+  basePath,
+  current,
+  sessions,
+}: {
+  basePath: string;
+  current: Session;
+  sessions: Session[];
+}) {
+  const shown = SESSION_ORDER.filter((s) => sessions.includes(s));
+  if (shown.length < 2) return null;
+  return (
+    <nav className="tabs" aria-label="회차">
+      {shown.map((s) => (
+        <Link
+          key={s}
+          href={s === "pm" ? basePath : `${basePath}?s=${s}`}
+          className={s === current ? "tab tab--on" : "tab"}
+          aria-current={s === current ? "page" : undefined}
+          scroll={false}
+        >
+          {SESSION_LABEL[s]}
+        </Link>
+      ))}
+    </nav>
+  );
 }
 
 /** 2026-09-15 → 2026.09.15 (마스트헤드에서 가장 큰 요소) */
@@ -153,7 +201,13 @@ const TOPIC_BLOCKS: Array<{ kind: string; id: string; label: string }> = [
  * 지수, 금리, 수급, 업종 등락률 같은 수치 블록은 2026-09-15 회차에 화면에서 뺐다(사용자 지시).
  * 수집과 적재는 계속 돌고 있으니 되돌리려면 이 파일에 블록을 다시 넣으면 된다.
  */
-export default function BriefView({ brief, topics = [], recent = [] }: Props) {
+export default function BriefView({
+  brief,
+  sessions = [],
+  basePath = `/brief/${brief.tradeDate}`,
+  topics = [],
+  recent = [],
+}: Props) {
   const blocks: Array<{
     id: string;
     label: string;
@@ -246,6 +300,7 @@ export default function BriefView({ brief, topics = [], recent = [] }: Props) {
   }
 
   const day = weekday(brief.tradeDate);
+  const time = runTime(brief.runId);
 
   return (
     <Shell
@@ -261,6 +316,17 @@ export default function BriefView({ brief, topics = [], recent = [] }: Props) {
           <span className="date-xl">{dotted(brief.tradeDate)}</span>
           {day ? <span className="masthead-meta">{day}요일</span> : null}
         </div>
+
+        <SessionTabs
+          basePath={basePath}
+          current={brief.session}
+          sessions={sessions}
+        />
+
+        <p className="edition">
+          {SESSION_LABEL[brief.session]}
+          {time ? ` · ${time} 기준` : null}
+        </p>
 
         <h1 className="headline">{renderText(brief.headline)}</h1>
       </header>

@@ -18,6 +18,7 @@ export const termType = pgEnum("term_type", ["name", "code", "alias", "phrase"])
 export const auditResult = pgEnum("audit_result", ["pass", "fail"]);
 export const auditStage = pgEnum("audit_stage", ["ingest", "publish", "render"]);
 export const topicKind = pgEnum("topic_kind", ["news", "theme", "sector"]);
+export const briefSession = pgEnum("brief_session", ["am", "pm"]);
 
 /** 일자별 브리핑 본문. 여기에 들어가는 텍스트는 전부 차단 필터를 통과한 것만. */
 export const dailyBrief = pgTable(
@@ -25,6 +26,13 @@ export const dailyBrief = pgTable(
   {
     id: serial("id").primaryKey(),
     tradeDate: date("trade_date").notNull(),
+    /**
+     * 회차 구분. 원본 루틴이 하루 두 번 쓴다.
+     *   am — 07:4x 프리마켓 에디션 (전일 미국장 + 오늘 전망). 날짜 폴더 루트에 놓인다.
+     *   pm — 15:3x 마감 종합 (당일 종가 확정). run-HHMM/ 하위에 놓인다.
+     * 같은 날짜에 둘이 공존하므로 유니크 키는 (trade_date, session)이다.
+     */
+    session: briefSession("session").notNull().default("pm"),
     /** 원본 회차 식별자 (예: run-1535). 추적용이며 원본은 수정하지 않는다. */
     runId: varchar("run_id", { length: 32 }).notNull(),
     headline: text("headline").notNull(),
@@ -42,7 +50,7 @@ export const dailyBrief = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex("daily_brief_trade_date_key").on(t.tradeDate),
+    uniqueIndex("daily_brief_trade_date_session_key").on(t.tradeDate, t.session),
     index("daily_brief_status_idx").on(t.status, t.tradeDate),
   ]
 );

@@ -39,6 +39,7 @@ export async function persist(p: BriefPayload, publish: boolean): Promise<number
 
   const values = {
     tradeDate: p.tradeDate,
+    session: p.session,
     runId: p.runId,
     headline: p.headline,
     summary: p.summary,
@@ -52,7 +53,8 @@ export async function persist(p: BriefPayload, publish: boolean): Promise<number
   const [row] = await db
     .insert(dailyBrief)
     .values(values)
-    .onConflictDoUpdate({ target: dailyBrief.tradeDate, set: values })
+    // 같은 날짜라도 am/pm은 별개 행이다. 같은 (날짜, 세션)을 다시 넣으면 덮어쓴다.
+    .onConflictDoUpdate({ target: [dailyBrief.tradeDate, dailyBrief.session], set: values })
     .returning({ id: dailyBrief.id });
   const briefId = row.id;
 
