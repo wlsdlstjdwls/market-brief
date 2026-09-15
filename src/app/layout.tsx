@@ -24,6 +24,9 @@ function Footer() {
           <Link href="/disclaimer" className="underline underline-offset-4">
             면책 고지
           </Link>
+          <Link href="/privacy" className="underline underline-offset-4">
+            개인정보 처리방침
+          </Link>
           <Link href="/archive" className="underline underline-offset-4">
             지난 브리핑
           </Link>
