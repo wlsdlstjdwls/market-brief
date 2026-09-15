@@ -13,10 +13,14 @@
 
 import { scan } from "./guard";
 import {
-  splitSections, parseTables, paragraphs, cleanHeading, toNumber, toPercent,
+  splitSections, parseTables, paragraphs, cleanHeading, dedot, toNumber, toPercent,
   type Section,
 } from "./markdown";
 import { INDICES, MACROS, SECTORS } from "./registry";
+import { cleanHeadline } from "./headline";
+import { extractTopics, type DroppedTopic, type Topic } from "./topics";
+
+export type { Topic, TopicLine } from "./topics";
 
 export const SOURCE_ALLOW = ["시황.md", "일일리포트.md", "섹터분석.md"] as const;
 export const SOURCE_DENY = ["종목뉴스.md"] as const;
@@ -41,6 +45,8 @@ export interface BriefPayload {
   summary: string;
   macroCommentary: string;
   marketSummary: string;
+  /** 뉴스 분석 카드 (섹션 1 Executive Summary + 섹션 5 핵심 테마) */
+  topics: Topic[];
   indices: Array<{ indexCode: string; indexName: string; close: number | null; changePct: number | null; sortOrder: number }>;
   macros: Array<{ kind: "rate" | "fx" | "oil" | "commodity" | "volatility"; name: string; value: number | null; unit: string; changePct: number | null; sortOrder: number }>;
   flows: Array<{ market: string; investor: "foreign" | "institution" | "retail"; netAmount: number | null }>;
@@ -80,7 +86,7 @@ function cleanParagraphs(s: Section, dropped: DroppedBlock[]): string[] {
       });
       continue;
     }
-    kept.push(p);
+    kept.push(dedot(p));
   }
   return kept;
 }
@@ -175,6 +181,7 @@ export function assertRegistryOnly(p: BriefPayload): void {
     throw new Error(`레지스트리에 없는 항목이 있습니다: ${bad.join(", ")}`);
 }
 
+
 export function buildPayload(
   files: Record<string, string>,
   tradeDate: string,
@@ -185,8 +192,12 @@ export function buildPayload(
 
   const dropped: DroppedBlock[] = [];
   const all: Section[] = [];
+  const topics: Topic[] = [];
+  const droppedTopics: DroppedTopic[] = [];
   for (const [name, md] of Object.entries(files)) {
-    for (const s of splitSections(md)) {
+    const sections = splitSections(md);
+    topics.push(...extractTopics(sections, droppedTopics));
+    for (const s of sections) {
       if (sectionDenied(s)) {
         dropped.push({
           heading: `${name} › ${cleanHeading(s.heading)}`,
@@ -205,25 +216,38 @@ export function buildPayload(
   const macroParas = usSections.flatMap((s) => cleanParagraphs(s, dropped));
   const krParas = krSections.flatMap((s) => cleanParagraphs(s, dropped));
 
+  /*
+   * 헤드라인은 그날 첫 뉴스 카드의 제목이다.
+   * 예전에는 "코스피 6,954.52 (-0.58%)"처럼 지수 종가를 썼는데, 이 사이트가 읽히는 이유가
+   * 지수 숫자가 아니라 뉴스라서 바꿨다(사용자 지시). 뉴스가 한 장도 없는 회차만 날짜로 떨어진다.
+   */
+  const lead = topics.find((t) => t.kind === "news") ?? topics[0];
+  const headline = lead ? cleanHeadline(lead.title) : `${tradeDate} 브리핑`;
+  const leadText = lead?.lines[0]?.text ?? "";
+
   const indices = mapIndices(market);
-  const kospi = indices.find((i) => i.indexCode === "KOSPI");
-  const headline =
-    kospi && kospi.changePct !== null
-      ? `코스피 ${kospi.close?.toLocaleString() ?? ""} (${kospi.changePct > 0 ? "+" : ""}${kospi.changePct}%)`
-      : `${tradeDate} 시장 브리핑`;
 
   const payload: BriefPayload = {
     tradeDate,
     runId,
     headline,
-    summary: krParas[0] ?? macroParas[0] ?? "",
+    summary: leadText || krParas[0] || macroParas[0] || "",
     macroCommentary: macroParas.join("\n\n"),
     marketSummary: krParas.join("\n\n"),
+    topics,
     indices,
     macros: mapMacros(market),
     flows: mapFlows(market),
     sectors: mapSectors(market),
-    dropped,
+    dropped: [
+      ...dropped,
+      ...droppedTopics.map((d) => ({
+        heading: d.title,
+        reason: "equity-mention" as const,
+        matches: d.matches,
+        sample: "",
+      })),
+    ],
   };
   assertRegistryOnly(payload);
   return payload;

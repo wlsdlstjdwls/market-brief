@@ -51,6 +51,20 @@ const EQUITY_PHRASES = [
   "급등주", "갭상승", "갭하락", "종목추천",
 ];
 
+/**
+ * 사전이 KRX 표기(영문)만 갖고 있어 한글로 쓰면 빠져나가는 종목들.
+ *
+ * 예를 들어 사전에는 `NAVER`만 있어서 "엔비디아, 네이버에 1.48조원 투자" 같은 제목이
+ * 그대로 통과했다. 실제로 새던 구멍이라 별도 목록으로 막는다.
+ * 여기 없는 표기가 또 발견되면 이 목록에 추가한다.
+ */
+const HANGUL_ALIASES = [
+  "네이버", "에스케이", "엘지", "케이티", "지에스", "씨제이", "엘에스",
+  "에이치엠엠", "에스오일", "에쓰오일", "엔씨소프트", "에스케이씨",
+  "케이씨씨", "에이치디씨", "에프앤에프", "엔에이치엔", "오씨아이",
+  "디엘이앤씨", "포스코", "한국전력", "케이비금융", "디비하이텍",
+];
+
 /** 앞뒤가 숫자가 아닌 6자리 숫자만 종목코드로 본다. */
 const CODE_RE = /(?<![0-9])[0-9]{6}(?![0-9])/g;
 
@@ -83,6 +97,12 @@ export function buildTerms(): Term[] {
     seen.add(term);
     out.push({ term, lower: term.toLowerCase(), rule: "name" });
   }
+  for (const a of HANGUL_ALIASES) {
+    if (seen.has(a)) continue;
+    seen.add(a);
+    out.push({ term: a, lower: a.toLowerCase(), rule: "name" });
+  }
+
   for (const p of EQUITY_PHRASES) {
     if (seen.has(p)) continue;
     seen.add(p);

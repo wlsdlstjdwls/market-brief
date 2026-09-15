@@ -1,12 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { db, hasDb } from "../db/index";
-import {
-  dailyBrief,
-  marketIndex,
-  macroIndicator,
-  investorFlow,
-  sectorIndex,
-} from "../db/schema";
+import { dailyBrief, briefTopic } from "../db/schema";
 
 export type Brief = typeof dailyBrief.$inferSelect;
 
@@ -57,26 +51,17 @@ export async function getBrief(tradeDate?: string) {
     const brief = rows[0];
     if (!brief || brief.status !== "published") return null;
 
-    const [indices, macros, flows, sectors] = await Promise.all([
-      db
-        .select()
-        .from(marketIndex)
-        .where(eq(marketIndex.briefId, brief.id))
-        .orderBy(marketIndex.sortOrder),
-      db
-        .select()
-        .from(macroIndicator)
-        .where(eq(macroIndicator.briefId, brief.id))
-        .orderBy(macroIndicator.sortOrder),
-      db.select().from(investorFlow).where(eq(investorFlow.briefId, brief.id)),
-      db
-        .select()
-        .from(sectorIndex)
-        .where(eq(sectorIndex.briefId, brief.id))
-        .orderBy(sectorIndex.rank),
-    ]);
+    /*
+     * 화면이 뉴스만 싣기 때문에 지수, 금리, 수급, 업종은 더 이상 읽지 않는다.
+     * 테이블과 수집 파이프라인은 그대로 있으니 되살리려면 여기에 조회를 다시 넣으면 된다.
+     */
+    const topics = await db
+      .select()
+      .from(briefTopic)
+      .where(eq(briefTopic.briefId, brief.id))
+      .orderBy(briefTopic.kind, briefTopic.rank);
 
-    return { brief, indices, macros, flows, sectors };
+    return { brief, topics };
   } catch (e) {
     console.error("getBrief 실패:", e);
     return null;

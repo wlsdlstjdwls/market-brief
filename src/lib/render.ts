@@ -16,7 +16,16 @@ export function renderMarkdown(md: string | null | undefined): string {
   if (scan(md).violations.length) return BLOCKED_NOTICE;
   // 원문에 든 HTML은 신뢰하지 않는다.
   const escaped = md.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  return marked.parse(escaped) as string;
+  const html = marked.parse(escaped) as string;
+
+  /*
+   * 남은 `**…**` 되살리기.
+   * CommonMark는 닫는 `**` 앞이 구두점이고 뒤가 글자면 강조로 보지 않는다
+   * (`되돌림(약세 전환)**으로` 가 그 경우다). 한국어 원문에서 흔한 형태라
+   * 화면에 별표가 그대로 남는다. 이미 이스케이프된 문자열이라 여기서 태그를
+   * 붙여도 새 HTML이 주입되지 않는다.
+   */
+  return html.replace(/\*\*(?!\s)([^*\n]+?)\*\*/g, "<strong>$1</strong>");
 }
 
 /** 짧은 텍스트용. 위반 시 안내 문구로 대체한다. */

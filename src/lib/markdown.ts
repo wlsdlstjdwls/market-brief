@@ -74,7 +74,7 @@ export function proseOnly(body: string): string {
 
 /** 문단 단위로 쪼갠다 (차단 필터를 문단 단위로 적용하기 위함). */
 export function paragraphs(body: string): string[] {
-  return proseOnly(body)
+  return stripNoise(proseOnly(body))
     .split(/\n\s*\n/)
     .map((p) => p.trim())
     .filter(Boolean);
@@ -102,4 +102,36 @@ export function toPercent(s: string | undefined): number | null {
   if (!s) return null;
   const m = /([+-]?\d+(?:\.\d+)?)\s*%/.exec(s);
   return m ? Number(m[1]) : null;
+}
+
+/**
+ * 가운뎃점을 쉼표로 바꾼다.
+ *
+ * 원본 리포트는 "외국인·기관·개인"처럼 가운뎃점으로 단어를 잇는데, 사용자 지시로
+ * 화면에서 이 기호를 쓰지 않는다. 적재 단계에서 바꾸므로 DB에도 남지 않는다.
+ */
+export function dedot(s: string): string {
+  return s.replace(/\s*[·ㆍ]\s*/g, ", ");
+}
+
+/**
+ * 산문에서 원본 내부용 줄을 걷어낸다.
+ *
+ *   - `*(상세 분석은 시황.md 2장 참고)*` 같은 파일 상호참조. 이 사이트는 그 파일들을
+ *     이미 같이 읽어 한 페이지에 싣기 때문에, 독자에게는 가리킬 곳이 없는 문장이다.
+ *   - 원본 말미의 면책 고지 인용문. 사이트 하단에 같은 취지의 문구가 이미 있다.
+ */
+const NOISE_LINE = [
+  /(시황|일일리포트|섹터분석|종목뉴스)\.md/,
+  /^\s*[*_(]*\s*상세\s*(분석)?은/,
+  /^\s*>\s*\*?\*?면책/,
+  /* 시세만 적힌 목록 줄. 이 사이트는 지수 값을 싣지 않는다(사용자 지시). */
+  /^\s*[-*]\s*\**\s*(코스피|코스닥|나스닥|다우|S&P\s*500|러셀|닛케이|상하이|수급|환율|원\/달러|엔\/달러|달러인덱스|WTI|브렌트|금|VIX|국고채|미\s*국채)\s*\**\s*[:：]/,
+];
+
+export function stripNoise(body: string): string {
+  return body
+    .split(/\r?\n/)
+    .filter((l) => !NOISE_LINE.some((re) => re.test(l)))
+    .join("\n");
 }

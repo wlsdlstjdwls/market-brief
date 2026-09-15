@@ -22,10 +22,7 @@ export default async function BriefPage({ params }: Params) {
   return (
     <BriefView
       brief={data.brief}
-      indices={data.indices}
-      macros={data.macros}
-      flows={data.flows}
-      sectors={data.sectors}
+      topics={data.topics}
     />
   );
 }

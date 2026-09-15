@@ -2,7 +2,8 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db/index";
 import {
-  dailyBrief, marketIndex, macroIndicator, investorFlow, sectorIndex, publishAudit,
+  dailyBrief, marketIndex, macroIndicator, investorFlow, sectorIndex, briefTopic,
+  publishAudit,
 } from "../db/schema";
 import { assertObjectClean, EquityMentionError, scan } from "./guard";
 import { assertRegistryOnly, type BriefPayload } from "./extract";
@@ -11,6 +12,11 @@ function narrative(p: BriefPayload) {
   return {
     headline: p.headline, summary: p.summary,
     macroCommentary: p.macroCommentary, marketSummary: p.marketSummary,
+    // 뉴스 카드도 같은 관문을 통과해야 한다. topics.ts에서 한 번 걸렀지만 여기가 마지막이다.
+    topics: p.topics.map((t) => ({
+      title: t.title,
+      lines: t.lines.map((l) => l.text),
+    })),
   };
 }
 
@@ -56,6 +62,7 @@ export async function persist(p: BriefPayload, publish: boolean): Promise<number
     db.delete(macroIndicator).where(eq(macroIndicator.briefId, briefId)),
     db.delete(investorFlow).where(eq(investorFlow.briefId, briefId)),
     db.delete(sectorIndex).where(eq(sectorIndex.briefId, briefId)),
+    db.delete(briefTopic).where(eq(briefTopic.briefId, briefId)),
   ]);
 
   const num = (v: number | null) => (v === null ? null : String(v));
@@ -77,6 +84,12 @@ export async function persist(p: BriefPayload, publish: boolean): Promise<number
     await db.insert(sectorIndex).values(p.sectors.map((s) => ({
       briefId, krxSectorCode: s.krxSectorCode, sectorName: s.sectorName,
       changePct: num(s.changePct), rank: s.rank,
+    })));
+
+  if (p.topics.length)
+    await db.insert(briefTopic).values(p.topics.map((t) => ({
+      briefId, kind: t.kind, rank: t.rank, title: t.title,
+      impact: t.impact, lines: t.lines,
     })));
 
   const check = scan([p.headline, p.summary, p.macroCommentary, p.marketSummary].join("\n"));

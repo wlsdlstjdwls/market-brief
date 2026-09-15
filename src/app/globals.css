@@ -1,46 +1,525 @@
 @import "tailwindcss";
 
-:root {
-  --bg: #fbfbfa;
-  --fg: #1c1b1a;
-  --muted: #6b6864;
-  --line: #e4e2de;
-  --card: #ffffff;
-  --up: #c0392b;
-  --down: #1f6fb2;
-}
+/*
+ * 디자인 기준: design/design-spec.md — 관공서 통계 고시표.
+ * - 카드·박스·둥근 모서리·배경 채움 없음. 헤어라인과 점선 리더만으로 구분한다.
+ * - 좌측 라벨 거터 + 데이터 행이 핵심 패턴. 가장 큰 요소는 헤드라인이 아니라 날짜다.
+ * - 한 가족(Noto Sans KR)만 쓴다. 세리프·모노 없음.
+ * - 라이트 단일. 다크 토큰은 아직 정의하지 않았다.
+ */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #131312;
-    --fg: #eceae6;
-    --muted: #9a958e;
-    --line: #2b2a28;
-    --card: #1b1a19;
-    --up: #e8705f;
-    --down: #6aa8e0;
-  }
+:root {
+  --bg: #fbfaf7;
+  --fg: #14161a;
+  --lead: #4a4e52; /* 리드 본문 — muted보다 한 단계 진하다 */
+  --muted: #6e7276;
+  --faint: #8c9095;
+  --fainter: #a4a8ac;
+  --faintest: #c2c0ba;
+  --line: #dcd9d2;
+  --line-dot: #d6d3cc;
+  --rule-strong: #14161a;
+  --accent: #2563eb; /* 브랜드 블루. 잉크와 확실히 갈리도록 밝기를 올린 값 */
+  --up: #a32d22;
+  --down: #1b5e9e;
 }
 
 html {
-  color-scheme: light dark;
+  color-scheme: light;
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--bg);
   color: var(--fg);
-  font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-  -webkit-font-smoothing: antialiased;
+  font-family: var(--font-sans), "Noto Sans KR", -apple-system,
+    BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+  font-size: 15px;
   line-height: 1.7;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--accent);
+}
+
+[id] {
+  scroll-margin-top: 4.5rem;
+}
+
+/* ---------- 상단 바 ---------- */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(251, 250, 247, 0.94);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.topbar-inner {
+  margin: 0 auto;
+  max-width: 1120px;
+  padding: 11px clamp(20px, 4vw, 40px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 24px;
+}
+
+.wordmark {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.topnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.topnav a[aria-current="page"] {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.topbar-note {
+  margin-left: auto;
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+/* ---------- 셸 (목차 거터 + 본문) ---------- */
+
+.shell {
+  margin: 0 auto;
+  max-width: 1120px;
+  padding: 0 clamp(20px, 4vw, 40px) 80px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0 clamp(28px, 4vw, 56px);
+}
+
+.shell-rail {
+  flex: 0 1 170px;
+  min-width: 150px;
+  padding: clamp(40px, 6vw, 72px) 0 24px;
+}
+
+/*
+ * 740px 미만에서는 목차가 본문 위로 접힌다(줄바꿈은 flex-wrap이 알아서 한다).
+ * 접힌 상태에서 sticky를 두면 전체폭 목차가 본문을 덮으므로 그때만 끈다.
+ */
+@media (min-width: 740px) {
+  .shell-rail {
+    position: sticky;
+    top: 66px;
+  }
+}
+
+.shell-main {
+  flex: 1 1 560px;
+  min-width: 0;
+}
+
+/* ---------- 좌측 목차 ---------- */
+
+.rail-title {
+  margin: 0 0 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--fainter);
+}
+
+.rail-link {
+  display: flex;
+  gap: 10px;
+  border-left: 1px solid var(--line);
+  padding: 5px 0 5px 12px;
+  font-size: 13px;
+  color: var(--muted);
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.rail-link:hover {
+  color: var(--fg);
+}
+
+.rail-link[aria-current="true"] {
+  color: var(--accent);
+  border-left-color: var(--accent);
+  font-weight: 600;
+}
+
+.rail-ord {
+  color: var(--fainter);
+}
+
+.rail-meta {
+  margin: 18px 0 0;
+  padding-left: 13px;
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--faintest);
+}
+
+/* ---------- 마스트헤드 ---------- */
+
+.masthead {
+  padding: clamp(40px, 6vw, 72px) 0 clamp(28px, 4vw, 40px);
+}
+
+.masthead-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px 20px;
+}
+
+.date-xl {
+  font-size: clamp(40px, 7vw, 68px);
+  font-weight: 300;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.masthead-meta {
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+}
+
+.headline {
+  margin: clamp(20px, 3vw, 30px) 0 0;
+  max-width: 30ch;
+  font-size: clamp(21px, 2.8vw, 29px);
+  font-weight: 600;
+  line-height: 1.42;
+  letter-spacing: -0.03em;
+  text-wrap: pretty;
+  overflow-wrap: break-word;
+}
+
+.lead {
+  margin: 16px 0 0;
+  max-width: 60ch;
+  font-size: 15.5px;
+  line-height: 1.9;
+  color: var(--lead);
+  text-wrap: pretty;
+}
+
+.page-title {
+  margin: 0;
+  font-size: clamp(28px, 4.5vw, 44px);
+  font-weight: 300;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+
+.sec-heading {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* ---------- 섹션 ---------- */
+
+.sec {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  padding: 26px 0;
+  border-top: 1px solid var(--line);
+}
+
+.sec--first {
+  border-top-color: var(--rule-strong);
+}
+
+.sec-gutter {
+  flex: 0 0 130px;
+  min-width: 130px;
+}
+
+.sec-body {
+  flex: 1 1 380px;
+  min-width: 0;
+}
+
+.sec-label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+}
+
+.sec-note {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: var(--fainter);
+}
+
+.sec-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--fainter);
+}
+
+.sec-empty {
+  margin: 0;
+  max-width: 56ch;
+  font-size: 14.5px;
+  line-height: 1.85;
+  color: var(--muted);
+}
+
+/* ---------- 데이터 행 ---------- */
+
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px dotted var(--line-dot);
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.row-name {
+  font-size: 14.5px;
+}
+
+.row-name--none {
+  color: var(--fainter);
+}
+
+.row-gap {
+  flex: 1;
+  min-width: 12px;
+}
+
+.row-val {
+  font-size: 15.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.row-val--lg {
+  font-size: 17px;
+}
+
+.row-unit {
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.row-pct {
+  width: 72px;
+  text-align: right;
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+
+.row-none {
+  font-size: 13px;
+  color: var(--fainter);
+  white-space: nowrap;
+}
+
+.sub-label {
+  margin: 0 0 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--faint);
+}
+
+.sub-label + .row,
+.row + .sub-label {
+  margin-top: 0;
+}
+
+.sub-label--gap {
+  margin-top: 22px;
+}
+
+/* ---------- 목록 행 (지난 브리핑) ---------- */
+
+.list-row {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 8px 0;
+  border-bottom: 1px dotted var(--line-dot);
+}
+
+.list-row:last-child {
+  border-bottom: 0;
+}
+
+.list-date {
+  flex: 0 0 78px;
+  font-size: 12.5px;
+  color: var(--fainter);
+}
+
+.list-title {
+  font-size: 14.5px;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+/* ---------- 뉴스 카드 ---------- */
+
+.topic {
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+}
+
+.topic:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.topic-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.topic-no {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--fainter);
+  font-variant-numeric: tabular-nums;
+}
+
+.topic-title {
+  margin: 0;
+  font-size: 16.5px;
+  line-height: 1.5;
+  letter-spacing: -0.015em;
+  font-weight: 600;
+  text-wrap: pretty;
+}
+
+/*
+ * 영향도 배지. 등급이 셀수록 강하게 칠한다.
+ * "큼"만 적으면 무엇이 큰지 알 수 없어서 "시장 영향"을 앞에 붙인다.
+ */
+/*
+ * 영향도 미터. 알약이나 테두리 박스를 쓰지 않는다 — 이 레이아웃은 헤어라인만 쓰는
+ * 활자 중심이라 박스가 겉돈다. 칸을 채운 막대 수가 곧 등급이다.
+ */
+.topic-impact {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.impact-meter {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.impact-bar {
+  width: 4px;
+  height: 11px;
+  border-radius: 1px;
+  background: var(--line);
+}
+
+.impact-bar--on {
+  background: currentColor;
+}
+
+.topic-impact--max {
+  color: #b3261e;
+  font-weight: 700;
+}
+
+.topic-impact--high {
+  color: #b3261e;
+}
+
+.topic-impact--mid {
+  color: #55595e;
+}
+
+.topic-impact--low {
+  color: var(--faint);
+}
+
+.topic-line {
+  margin: 10px 0 0;
+  max-width: 60ch;
+  font-size: 14.5px;
+  line-height: 1.85;
+}
+
+/*
+ * 항목 이름은 본문과 같은 줄에 둔다. 줄을 따로 잡으면 카드 하나에 작은 제목이 네 개씩
+ * 쌓여 정작 본문이 안 읽힌다는 지적이 있었다. 대신 색과 굵기로 구분한다.
+ */
+.topic-label {
+  margin-right: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* ---------- 산문 ---------- */
+
+.prose {
+  max-width: 60ch;
+  font-size: 14.5px;
+  line-height: 1.85;
 }
 
 .prose p {
-  margin: 0 0 1rem;
+  margin: 0 0 0.9rem;
+}
+
+.prose p:last-child {
+  margin-bottom: 0;
 }
 
 .prose ul {
-  margin: 0 0 1rem;
+  margin: 0 0 0.9rem;
   padding-left: 1.1rem;
   list-style: disc;
 }
@@ -49,27 +528,105 @@ body {
   margin: 0.25rem 0;
 }
 
+.prose li::marker {
+  color: var(--fainter);
+}
+
 .prose strong {
   font-weight: 600;
 }
 
 .prose code {
-  background: var(--line);
-  padding: 0.1em 0.35em;
-  border-radius: 4px;
   font-size: 0.9em;
+  color: var(--muted);
+}
+
+.prose hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 1.2rem 0;
 }
 
 .prose h2,
 .prose h3 {
+  font-size: 14.5px;
   font-weight: 600;
-  margin: 1.5rem 0 0.6rem;
+  margin: 1.4rem 0 0.5rem;
 }
 
 .blocked {
+  color: var(--fainter);
+  font-size: 13px;
+}
+
+.body-text {
+  margin: 0;
+  max-width: 66ch;
+  font-size: 14.5px;
+  line-height: 1.9;
   color: var(--muted);
-  font-size: 0.875rem;
-  border: 1px dashed var(--line);
-  padding: 0.75rem;
-  border-radius: 8px;
+}
+
+.body-text + .body-text {
+  margin-top: 10px;
+}
+
+.body-text strong {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.body-text a {
+  border-bottom: 1px solid var(--line);
+}
+
+/* ---------- 메타 한 줄 ---------- */
+
+.meta {
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+/* ---------- 푸터 ---------- */
+
+.site-footer {
+  padding: 26px 0 0;
+  border-top: 1px solid var(--rule-strong);
+}
+
+/* 이름과 링크는 한 줄. 130px 거터에 넣으면 링크가 세로로 쌓인다. */
+.footer-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 22px;
+  margin-bottom: 14px;
+}
+
+.footer-mark {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.footer-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.footer-note {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.9;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+.footer-note--faint {
+  margin: 10px 0 0;
+  color: var(--fainter);
 }

@@ -130,6 +130,7 @@ test("레지스트리에 없는 라벨은 거부한다", () => {
     flows: [],
     sectors: [],
     dropped: [],
+    topics: [],
   } as BriefPayload;
   assert.throws(() => assertRegistryOnly(bad), /레지스트리/);
 });

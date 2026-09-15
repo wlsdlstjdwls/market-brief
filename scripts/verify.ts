@@ -51,9 +51,8 @@ function check(label: string, text: string): number {
 
 async function checkDb(): Promise<number> {
   const { db } = await import("../src/db/index");
-  const { dailyBrief, marketIndex, macroIndicator, sectorIndex } = await import(
-    "../src/db/schema"
-  );
+  const { dailyBrief, marketIndex, macroIndicator, sectorIndex, briefTopic } =
+    await import("../src/db/schema");
   const { eq } = await import("drizzle-orm");
 
   const briefs = await db
@@ -69,11 +68,25 @@ async function checkDb(): Promise<number> {
     );
     total += check(`daily_brief ${b.tradeDate}`, text);
 
-    const [idx, mac, sec] = await Promise.all([
+    const [idx, mac, sec, topics] = await Promise.all([
       db.select().from(marketIndex).where(eq(marketIndex.briefId, b.id)),
       db.select().from(macroIndicator).where(eq(macroIndicator.briefId, b.id)),
       db.select().from(sectorIndex).where(eq(sectorIndex.briefId, b.id)),
+      db.select().from(briefTopic).where(eq(briefTopic.briefId, b.id)),
     ]);
+    // 뉴스 카드는 산문이라 라벨 화이트리스트가 아니라 본문 스캔으로 본다.
+    const topicText = topics
+      .flatMap((t) => [
+        t.title,
+        ...(Array.isArray(t.lines)
+          ? (t.lines as Array<{ text?: unknown }>).map((l) =>
+              typeof l?.text === "string" ? l.text : "",
+            )
+          : []),
+      ])
+      .join("\n");
+    if (topicText) total += check(`brief_topic ${b.tradeDate} (${topics.length}장)`, topicText);
+
     const labels = [
       ...idx.map((r) => r.indexName),
       ...mac.map((r) => r.name),

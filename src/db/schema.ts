@@ -17,6 +17,7 @@ export const investorType = pgEnum("investor_type", ["foreign", "institution", "
 export const termType = pgEnum("term_type", ["name", "code", "alias", "phrase"]);
 export const auditResult = pgEnum("audit_result", ["pass", "fail"]);
 export const auditStage = pgEnum("audit_stage", ["ingest", "publish", "render"]);
+export const topicKind = pgEnum("topic_kind", ["news", "theme", "sector"]);
 
 /** 일자별 브리핑 본문. 여기에 들어가는 텍스트는 전부 차단 필터를 통과한 것만. */
 export const dailyBrief = pgTable(
@@ -44,6 +45,28 @@ export const dailyBrief = pgTable(
     uniqueIndex("daily_brief_trade_date_key").on(t.tradeDate),
     index("daily_brief_status_idx").on(t.status, t.tradeDate),
   ]
+);
+
+/**
+ * 뉴스 분석 카드. 원본 리포트의 Executive Summary·핵심 테마에서 뽑는다.
+ *
+ * 종목명을 담는 칸은 여기에도 없다. lines는 [{label, text}] 배열이고, 들어가기 전에
+ * src/lib/topics.ts가 카드 단위로, persist.ts가 적재 직전에 한 번 더 검사한다.
+ */
+export const briefTopic = pgTable(
+  "brief_topic",
+  {
+    id: serial("id").primaryKey(),
+    briefId: integer("brief_id").notNull().references(() => dailyBrief.id, { onDelete: "cascade" }),
+    kind: topicKind("kind").notNull(),
+    rank: integer("rank").notNull().default(0),
+    title: text("title").notNull(),
+    /** 영향도 등급 (뉴스만). 테마는 빈 문자열 */
+    impact: varchar("impact", { length: 16 }).notNull().default(""),
+    /** [{ label, text }] 순서 그대로 화면에 찍는다 */
+    lines: jsonb("lines").notNull(),
+  },
+  (t) => [index("brief_topic_brief_idx").on(t.briefId, t.kind, t.rank)]
 );
 
 /** 지수 (KOSPI, KOSDAQ, S&P500 ...). 개별 종목 아님. */
@@ -137,27 +160,3 @@ export const publishAudit = pgTable(
   },
   (t) => [index("publish_audit_date_idx").on(t.tradeDate)]
 );
-
-/* ---------- 유료 전환 대비 스텁. MVP에서는 화면·결제 코드를 붙이지 않는다. ---------- */
-
-export const subscriber = pgTable(
-  "subscriber",
-  {
-    id: serial("id").primaryKey(),
-    email: varchar("email", { length: 320 }).notNull(),
-    locale: varchar("locale", { length: 8 }).notNull().default("ko"),
-    status: varchar("status", { length: 16 }).notNull().default("pending"),
-    confirmToken: varchar("confirm_token", { length: 64 }),
-    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [uniqueIndex("subscriber_email_key").on(t.email)]
-);
-
-export const subscription = pgTable("subscription", {
-  id: serial("id").primaryKey(),
-  subscriberId: integer("subscriber_id").notNull().references(() => subscriber.id, { onDelete: "cascade" }),
-  plan: varchar("plan", { length: 16 }).notNull().default("free"),
-  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
-  expiresAt: timestamp("expires_at", { withTimezone: true }),
-});

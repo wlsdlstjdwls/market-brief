@@ -95,11 +95,20 @@ function narrativeOf(p: BriefPayload) {
 function report(p: BriefPayload) {
   console.log(`\n■ ${p.tradeDate} / ${p.runId}`);
   console.log(`  헤드라인 : ${p.headline}`);
-  console.log(`  지수 ${p.indices.length} · 지표 ${p.macros.length} · 수급 ${p.flows.length} · 섹터 ${p.sectors.length}`);
+  console.log(`  지수 ${p.indices.length} / 지표 ${p.macros.length} / 수급 ${p.flows.length} / 섹터 ${p.sectors.length}`);
   for (const i of p.indices) console.log(`    [지수] ${i.indexName} ${i.close ?? "-"} (${i.changePct ?? "-"}%)`);
   for (const m of p.macros) console.log(`    [지표] ${m.name} ${m.value ?? "-"}${m.unit} (${m.changePct ?? "-"}%)`);
   for (const f of p.flows) console.log(`    [수급] ${f.market} ${f.investor} ${f.netAmount ?? "-"}`);
   for (const s of p.sectors) console.log(`    [섹터] ${s.sectorName} (${s.changePct ?? "-"}%)`);
+  const KIND_KO = { news: "뉴스", theme: "테마", sector: "업종" } as const;
+  const count = (k: string) => p.topics.filter((t) => t.kind === k).length;
+  console.log(
+    `  뉴스 ${count("news")} / 테마 ${count("theme")} / 업종 ${count("sector")}`,
+  );
+  for (const t of p.topics)
+    console.log(
+      `    [${KIND_KO[t.kind]}] ${t.title}${t.impact ? ` (영향도 ${t.impact})` : ""}`,
+    );
   console.log(`  본문 : 매크로 ${p.macroCommentary.length}자 / 시장 ${p.marketSummary.length}자`);
   const bySection = new Map<string, number>();
   for (const d of p.dropped) bySection.set(d.reason, (bySection.get(d.reason) ?? 0) + 1);
