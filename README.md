@@ -81,15 +81,31 @@ npm test                                  # 차단 필터 회귀 테스트 18건
 npm run typecheck
 npm run guard -- ../요약/뉴스/2026/09      # 원본에 어떤 종목 표기가 있는지 확인
 npm run ingest -- --dry-run               # DB 없이 적재 결과 미리보기
+npm run verify                            # DB의 published 브리핑 검사
+npm run verify -- page.html               # 저장한 페이지 본문 검사
 ```
 
 `--dry-run`은 무엇이 제외됐는지 사유별로 출력한다.
 
 ## 배포
 
-1. Vercel에서 이 저장소 연결, **Root Directory를 `market-brief`로 지정**
-2. 환경변수 `DATABASE_URL` 주입 (Neon)
-3. 배포
+**푸시해도 자동 배포되지 않는다.** `vercel.json`의 `git.deploymentEnabled: false`가
+GitHub 이벤트로 생기는 배포를 막는다. 저장소는 연결돼 있지만 배포는 수동이다.
+
+```bash
+npm test && npm run typecheck    # 먼저 통과시킬 것
+vercel deploy --prod
+```
+
+미리보기만 올리려면 `--prod`를 뺀다.
+
+다시 자동 배포로 돌리려면 `vercel.json`에서 `git` 블록을 지운다.
+
+### 최초 설정 (이미 완료)
+
+1. Vercel 프로젝트 생성 및 GitHub 저장소 연결
+2. Neon을 Vercel Marketplace로 프로비저닝 (`DATABASE_URL` 자동 주입)
+3. `npm run db:push`, `npm run seed:terms`
 
 ## 화면
 
