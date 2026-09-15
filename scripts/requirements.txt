@@ -1,0 +1,6 @@
+# scripts/fetch_market.py 의존성.
+# GitHub Actions(daily-update.yml)와 로컬이 같은 파일을 쓴다.
+#   로컬:  pip install -r scripts/requirements.txt
+pandas
+requests
+finance-datareader

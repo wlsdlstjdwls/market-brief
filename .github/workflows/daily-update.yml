@@ -1,0 +1,153 @@
+# market-brief 일일 갱신 — 로컬 PC 없이 도는 경로.
+#
+# 로컬 작업스케줄러 MarketBrief-Update(= scripts/update_web.bat)와 같은 일을 한다.
+# 둘 다 켜두면 같은 회차를 두 번 적재하므로 한쪽만 쓴다.
+#
+# 원고(일일리포트.md)는 이 저장소가 아니라 stock-analysis 저장소에 있다.
+# 그래서 체크아웃을 두 번 하고 REPORT_ROOT로 위치를 알려준다.
+# ingest.ts가 `process.env.REPORT_ROOT ?? "../요약/뉴스"`를 보므로 코드는 그대로다.
+#
+# 배포는 하지 않는다. 페이지가 revalidate=300이라 적재만 하면 5분 안에 사이트에 뜬다.
+# vercel.json의 git.deploymentEnabled=false는 그대로 둔다.
+
+name: daily-update
+
+on:
+  schedule:
+    # 16:10 KST = 07:10 UTC. 평일만.
+    # 장 마감 15:30 + 업종 스냅샷 인정 시각 15:40 이후여야 한다. 앞으로 당기지 말 것.
+    - cron: "10 7 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      trade_date:
+        description: "대상 일자 YYYY-MM-DD (비우면 오늘 KST)"
+        required: false
+        type: string
+
+# 스케줄과 수동 실행이 겹쳐도 한 번에 하나만 돈다.
+concurrency:
+  group: daily-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TZ: Asia/Seoul
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      REPORT_ROOT: ${{ github.workspace }}/reports/요약/뉴스
+
+    steps:
+      - name: 본체 체크아웃
+        uses: actions/checkout@v4
+
+      # PAT 대신 read-only deploy key를 쓴다. 이 저장소에만 붙고, 쓰기가 아예 안 되고,
+      # 사람 계정 권한과 무관하게 해지된다(stock-analysis → Settings → Deploy keys).
+      - name: 원고 체크아웃 (stock-analysis, 읽기 전용)
+        uses: actions/checkout@v4
+        with:
+          repository: wlsdlstjdwls/stock-analysis
+          ssh-key: ${{ secrets.REPORTS_SSH_KEY }}
+          path: reports
+          # 원고만 받는다. 백테스트 산출물까지 받으면 느려진다.
+          sparse-checkout: 요약/뉴스
+          sparse-checkout-cone-mode: false
+
+      - name: 대상 일자 결정
+        id: date
+        run: |
+          D="${{ inputs.trade_date }}"
+          [ -z "$D" ] && D=$(date +%F)
+          echo "trade_date=$D" >> "$GITHUB_OUTPUT"
+          echo "대상 일자: $D (KST $(date +%F' '%H:%M))"
+
+      - name: 원고 존재 확인
+        id: source
+        run: |
+          D="${{ steps.date.outputs.trade_date }}"
+          DIR=$(find "$REPORT_ROOT" -type d -name "$D" 2>/dev/null | head -1)
+          if [ -z "$DIR" ]; then
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::$D 원고 없음 — 공휴일이거나 아직 안 쓴 날. 적재를 건너뛴다."
+            echo "### $D — 원고 없음, 스킵" >> "$GITHUB_STEP_SUMMARY"
+            echo "공휴일이거나 리포트 루틴이 아직 안 돌았다. 실패가 아니다." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "원고: $DIR"
+            ls -1 "$DIR"
+            echo "### $D — 적재 시도" >> "$GITHUB_STEP_SUMMARY"
+            echo "원고 \`${DIR#$GITHUB_WORKSPACE/}\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/setup-python@v5
+        if: steps.source.outputs.found == 'true'
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+
+      - uses: actions/setup-node@v4
+        if: steps.source.outputs.found == 'true'
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: 의존성 설치
+        if: steps.source.outputs.found == 'true'
+        run: |
+          pip install -r scripts/requirements.txt
+          # package.json이 전부 "latest"라 lock과 어긋나면 npm ci가 거부한다.
+          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+
+      - name: 1/3 시세 수집
+        if: steps.source.outputs.found == 'true'
+        run: python scripts/fetch_market.py "${{ steps.date.outputs.trade_date }}"
+
+      - name: 2/3 적재
+        if: steps.source.outputs.found == 'true'
+        run: npx tsx scripts/ingest.ts --date "${{ steps.date.outputs.trade_date }}" --publish
+
+      - name: 3/3 검증
+        if: steps.source.outputs.found == 'true'
+        run: |
+          npx tsx scripts/verify.ts | tee /tmp/verify.txt
+          {
+            echo ""
+            echo "<details><summary>검증 결과</summary>"
+            echo ""
+            echo '```'
+            cat /tmp/verify.txt
+            echo '```'
+            echo ""
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 수집 결과 보관 (실패 원인 추적용)
+        if: always() && steps.source.outputs.found == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: market-${{ steps.date.outputs.trade_date }}
+          path: data/market/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      # 실패하면 텔레그램으로 알린다. secret이 없으면 조용히 건너뛴다.
+      # (GitHub 기본 실패 메일과 별개. 메일만 써도 되면 이 step은 지워도 된다.)
+      - name: 실패 알림
+        if: failure()
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TRADE_DATE: ${{ steps.date.outputs.trade_date }}
+        run: |
+          # secret을 안 넣었으면 조용히 끝낸다. GitHub 기본 실패 메일은 어차피 간다.
+          if [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT" ]; then
+            echo "텔레그램 secret 없음 — 알림 건너뜀"
+            exit 0
+          fi
+          curl -sS -X POST "https://api.telegram.org/bot$TG_TOKEN/sendMessage" \
+            -d chat_id="$TG_CHAT" \
+            --data-urlencode "text=market-brief 일일 갱신 실패 — ${TRADE_DATE}
+          ${RUN_URL}" >/dev/null

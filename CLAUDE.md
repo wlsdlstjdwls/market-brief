@@ -97,14 +97,55 @@ npx tsx --env-file=.env.local scripts/ingest.ts --date 2026-09-08 --publish
 
 ## 일일 자동 실행
 
-작업 스케줄러 `MarketBrief-Update` — 평일 16:10 → `scripts/update_web.bat`.
-등록: `scripts\install_update_web_task.bat` (다시 돌리면 덮어쓴다).
-로그: `data/logs/update_web.log`.
+경로가 둘이다. **같은 일을 하므로 한쪽만 켜 둔다.**
+
+| | GitHub Actions (권장) | 로컬 작업 스케줄러 |
+|---|---|---|
+| 정의 | `.github/workflows/daily-update.yml` | `MarketBrief-Update` → `scripts/update_web.bat` |
+| 시각 | 평일 16:10 KST (`cron: 10 7 * * 1-5`, UTC) | 평일 16:10 |
+| PC 전원 | 무관 | **켜져 있고 로그인돼 있어야 함** (`Logon Mode: Interactive only`) |
+| 로그 | Actions 탭 + Step Summary | `data/logs/update_web.log` |
 
 16:10인 이유는 장 마감 15:30 + 업종 스냅샷 인정 시각 15:40 이후이고,
 상위 저장소의 `SimpleStock-Report-PM`(16:00)과 겹치지 않아서다. 더 앞으로 당기지 말 것.
+Actions 스케줄은 수 분 지연될 수 있는데, 늦는 방향이라 15:40 제약과는 충돌하지 않는다.
 
 **배포는 하지 않는다.** 페이지가 `revalidate = 300`이라 적재만 하면 5분 안에 사이트에 뜬다.
+
+### Actions 쪽 구성
+
+원고(`일일리포트.md`)는 이 저장소가 아니라 **`wlsdlstjdwls/stock-analysis`** 에 있다.
+그래서 체크아웃을 두 번 하고 `REPORT_ROOT`로 위치를 알려준다.
+`ingest.ts`가 `process.env.REPORT_ROOT ?? "../요약/뉴스"`를 보므로 스크립트는 수정하지 않았다.
+
+필요한 repository secret (Settings → Secrets and variables → Actions):
+
+| 이름 | 용도 | 값 출처 |
+|---|---|---|
+| `DATABASE_URL` | Neon 접속 | `.env.local`의 같은 키 |
+| `REPORTS_SSH_KEY` | private인 `stock-analysis` 체크아웃 | read-only deploy key 개인키 (공개키는 stock-analysis → Settings → Deploy keys) |
+| `TELEGRAM_BOT_TOKEN` · `TELEGRAM_CHAT_ID` | 실패 알림 (선택) | `../telegram_config.json` |
+
+텔레그램 secret이 없으면 알림 step은 조용히 건너뛴다. GitHub 기본 실패 메일은 그대로 온다.
+
+원고가 없는 날(공휴일·루틴 미실행)은 **실패가 아니다.** 적재 step들을 건너뛰고
+Step Summary에 "원고 없음, 스킵"만 남기고 정상 종료한다. 실패 알림도 가지 않는다.
+
+`python scripts/fetch_market.py`의 의존성은 `scripts/requirements.txt`에 있다. 로컬도 같은 파일을 쓴다.
+
+### 중복 실행은 안전하다
+
+`persist.ts`가 `daily_brief`를 `tradeDate` 기준 `onConflictDoUpdate`로 upsert하고,
+하위 5개 테이블은 `briefId`로 지운 뒤 다시 넣는다. 같은 날짜를 몇 번 돌려도 결과가 같다.
+그래도 두 경로를 동시에 켜 둘 이유는 없다. Actions 검증이 끝나면 로컬 태스크를 끈다.
+
+```powershell
+schtasks /Change /TN "MarketBrief-Update" /DISABLE   # 끄기
+schtasks /Change /TN "MarketBrief-Update" /ENABLE    # 되돌리기
+```
+
+**삭제하지 않는다.** `update_web.bat`은 손으로 한 회차만 돌릴 때 계속 쓰고,
+Actions가 막히면(네트워크 차단 등) 바로 되돌릴 수 있어야 한다.
 
 ## 배포
 
