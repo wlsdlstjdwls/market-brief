@@ -35,7 +35,8 @@ interface Run {
 }
 
 /**
- * 원본이 적어 둔 작성 기준시각을 읽는다. 예: `> 작성 기준시각: 2026-09-08 07:42 KST`
+ * 원본이 적어 둔 작성 시각을 읽는다. 예: `> 작성 기준시각: 2026-09-08 07:42 KST`
+ * 2026-09-15 회차처럼 `> 작성 시각: ...`로 쓴 날도 있다. 둘 다 받는다.
  * 여기서 뽑는 건 시각뿐이다. 시장 수치는 원문에서 절대 읽지 않는다(fetch_market.py 담당).
  */
 function writtenAt(dir: string): number | null {
@@ -43,7 +44,8 @@ function writtenAt(dir: string): number | null {
     const p = join(dir, name);
     if (!existsSync(p)) continue;
     const head = readFileSync(p, "utf8").slice(0, 2000);
-    const m = head.match(/작성\s*기준시각[^0-9]*\d{4}-\d{2}-\d{2}\s+(\d{1,2}):(\d{2})/);
+    // 표기가 회차마다 흔들린다. "작성 기준시각"과 "작성 시각"을 둘 다 받는다.
+    const m = head.match(/작성\s*(?:기준)?\s*시각[^0-9]*\d{4}-\d{2}-\d{2}\s+(\d{1,2}):(\d{2})/);
     if (m) return Number(m[1]) * 100 + Number(m[2]);
   }
   return null;

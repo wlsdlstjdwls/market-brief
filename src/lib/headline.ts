@@ -10,6 +10,12 @@
 const LEADING_NUMBER = /^\s*\d+\s*[.)]\s*/;
 
 /**
+ * 제목 전체를 감싼 대괄호. 2026-09-15 회차부터 `### [美 10년물 …]` 꼴로 쓴다.
+ * 안쪽에 또 대괄호가 있으면(인용 표기 등) 건드리지 않는다.
+ */
+const WRAPPED = /^\[([^\[\]]+)\]$/;
+
+/**
  * 지수 이름과 등락률만으로 이뤄진 조각인가.
  * "코스피 +1.64%, 코스닥 +2.95% 동반 급등"처럼 뒤에 붙는 짧은 서술어까지 한 덩어리로 본다.
  */
@@ -23,7 +29,7 @@ const QUOTE_ONLY = new RegExp(
 const SPLIT = /\s+[—–\-]\s+/;
 
 export function cleanHeadline(raw: string): string {
-  const title = raw.replace(LEADING_NUMBER, "").trim();
+  const title = raw.replace(LEADING_NUMBER, "").trim().replace(WRAPPED, "$1").trim();
   if (!title) return raw.trim();
 
   const parts = title.split(SPLIT);

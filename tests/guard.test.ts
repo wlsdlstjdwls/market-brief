@@ -14,6 +14,7 @@ import {
   assertRegistryOnly,
   type BriefPayload,
 } from "../src/lib/extract";
+import { cleanHeadline } from "../src/lib/headline";
 import { renderMarkdown, renderText } from "../src/lib/render";
 import { INDICES, MACROS, SECTORS } from "../src/lib/registry";
 
@@ -167,4 +168,15 @@ test("깨끗한 마크다운은 정상 렌더된다", () => {
 test("원문에 든 HTML은 이스케이프한다", () => {
   const html = renderMarkdown("코스피 <img src=x onerror=alert(1)> 마감");
   assert.ok(!html.includes("<img"));
+});
+
+/* 9. 제목 전체를 감싼 대괄호는 벗긴다 (2026-09-15 회차 표기) */
+
+test("제목을 감싼 대괄호를 벗긴다", () => {
+  assert.equal(
+    cleanHeadline("[美 10년물 국채금리 5% 근접, FOMC(9/15~16) 앞두고 금리인상 가능성 부각]"),
+    "美 10년물 국채금리 5% 근접, FOMC(9/15~16) 앞두고 금리인상 가능성 부각",
+  );
+  // 안쪽에 대괄호가 또 있으면 손대지 않는다
+  assert.equal(cleanHeadline("[속보] 어쩌고"), "[속보] 어쩌고");
 });
