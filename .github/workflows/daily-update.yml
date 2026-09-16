@@ -14,15 +14,24 @@ name: daily-update
 
 on:
   schedule:
-    # 원본 루틴이 하루 두 번 쓴다. 각 판이 나온 뒤에 한 번씩 받아 간다.
+    # 원본 루틴이 하루 두 번 쓴다. 회차마다 첫 슬롯 + 재시도 슬롯 둘을 둔다.
     #
-    # 08:10 KST = 23:10 UTC 전날 → UTC 일~목이 KST 월~금이다.
-    #   프리마켓판(원본 07:4x)을 받는다. 장 전이라 시세는 받지 않는다.
-    - cron: "10 23 * * 0-4"
-    # 16:40 KST = 07:40 UTC. 평일.
-    #   마감 종합판(원본 15:3x, 커밋은 15:53~16:18)을 받는다.
-    #   장 마감 15:30 + 업종 스냅샷 인정 시각 15:40 이후여야 한다. 앞으로 당기지 말 것.
-    - cron: "40 7 * * 1-5"
+    # GitHub의 스케줄은 보장이 아니라 최선 노력이다. 부하가 걸리면 몇 시간 밀리거나
+    # 아예 안 뜬다. 실제로 2026-09-15 마감판은 5시간 12분 늦게 떴고,
+    # 2026-09-16 프리마켓판은 뜨지 않았다(그래서 그날 화면이 비었다).
+    # 이미 받아 간 회차는 "이미 적재됨 확인" step이 걸러내므로 재시도는 공짜다.
+    #
+    # 프리마켓판(원본 07:4x). 장 전이라 시세는 받지 않는다.
+    # 23:10 UTC 전날 = 08:10 KST → UTC 일~목이 KST 월~금이다.
+    - cron: "10 23 * * 0-4"   # 08:10 KST — 첫 시도
+    - cron: "40 0 * * 1-5"    # 09:40 KST — 재시도 1
+    - cron: "40 2 * * 1-5"    # 11:40 KST — 재시도 2
+    #
+    # 마감 종합판(원본 15:3x, 커밋은 15:53~16:18).
+    # 장 마감 15:30 + 업종 스냅샷 인정 시각 15:40 이후여야 한다. 앞으로 당기지 말 것.
+    - cron: "40 7 * * 1-5"    # 16:40 KST — 첫 시도
+    - cron: "40 9 * * 1-5"    # 18:40 KST — 재시도 1
+    - cron: "40 11 * * 1-5"   # 20:40 KST — 재시도 2
   workflow_dispatch:
     inputs:
       trade_date:
@@ -81,7 +90,7 @@ jobs:
           S="$INPUT_SESSION"
           if [ -z "$S" ] && [ -n "$CRON" ]; then
             case "$CRON" in
-              "10 23 "*) S=am ;;
+              "10 23 "*|"40 0 "*|"40 2 "*) S=am ;;
               *) S=pm ;;
             esac
           fi
@@ -130,12 +139,29 @@ jobs:
           # package.json이 전부 "latest"라 lock과 어긋나면 npm ci가 거부한다.
           npm ci --no-audit --no-fund || npm install --no-audit --no-fund
 
+      # 재시도 슬롯이 하루 세 번 돈다. 첫 슬롯이 이미 받아 갔으면 여기서 끝낸다.
+      # persist가 upsert라 다시 넣어도 결과는 같지만, 도는 김에 원고를 다시 읽을
+      # 이유가 없고 로그도 "이미 있음"으로 끝나는 편이 읽기 쉽다.
+      # 회차를 지정하지 않은 수동 실행은 항상 false가 나와 그대로 진행한다.
+      - name: 이미 적재됨 확인
+        id: done
+        if: steps.source.outputs.found == 'true'
+        env:
+          SESSION: ${{ steps.date.outputs.session }}
+        run: |
+          EXISTS=$(npx tsx scripts/brief-exists.ts             --date "${{ steps.date.outputs.trade_date }}"             ${SESSION:+--session "$SESSION"} | tail -1)
+          echo "exists=$EXISTS" >> "$GITHUB_OUTPUT"
+          if [ "$EXISTS" = "true" ]; then
+            echo "::notice::${{ steps.date.outputs.trade_date }} $SESSION 은 이미 적재됨 — 건너뛴다."
+            echo "이미 적재된 회차라 건너뛴다. 실패가 아니다." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: 1/3 시세 수집
-        if: steps.source.outputs.found == 'true' && steps.date.outputs.fetch == 'true'
+        if: steps.source.outputs.found == 'true' && steps.done.outputs.exists != 'true' && steps.date.outputs.fetch == 'true'
         run: python scripts/fetch_market.py "${{ steps.date.outputs.trade_date }}"
 
       - name: 2/3 적재
-        if: steps.source.outputs.found == 'true'
+        if: steps.source.outputs.found == 'true' && steps.done.outputs.exists != 'true'
         env:
           SESSION: ${{ steps.date.outputs.session }}
         run: |
@@ -143,7 +169,7 @@ jobs:
           npx tsx scripts/ingest.ts             --date "${{ steps.date.outputs.trade_date }}"             ${SESSION:+--session "$SESSION"}             --publish
 
       - name: 3/3 검증
-        if: steps.source.outputs.found == 'true'
+        if: steps.source.outputs.found == 'true' && steps.done.outputs.exists != 'true'
         run: |
           npx tsx scripts/verify.ts | tee /tmp/verify.txt
           {
