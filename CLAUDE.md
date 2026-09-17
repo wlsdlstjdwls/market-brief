@@ -300,16 +300,47 @@ vercel deploy --prod
 
 자동 배포로 되돌리려면 `vercel.json`에서 `git` 블록을 지운다.
 
-## 현재 상태 (2026-09-15 기준)
+## 현재 상태 (2026-09-17 기준)
 
-- 배포됨: https://market-brief-xi.vercel.app (공개, 배포 보호 해제)
-- 저장소: https://github.com/wlsdlstjdwls/market-brief (private)
+- 배포됨: https://market-brief-xi.vercel.app (공개, 배포 보호 해제). **프로덕션 = 커밋 `3567fac`**
+- 저장소: https://github.com/wlsdlstjdwls/market-brief (private). 로컬과 원격 main이 같다
+- Vercel 요금제는 **Pro**다. Cron이 분 단위로 도는 근거이고, Hobby 한도로 판단하면 결론이 틀린다
 - Neon: Vercel Marketplace 연동, 무료 플랜, sin1 리전. `DATABASE_URL` 자동 주입
-- 스키마 적용 완료, 금칙어 5,765건 시드 완료
-- 발행된 브리핑: 2026-06-22 ~ 2026-09-08 거래일 44회차 (backfill.py로 일괄 적재)
+- 스키마 적용 완료(`written_at`까지), 금칙어 5,765건 시드 완료
+- 발행된 브리핑: **2026-06-22 ~ 2026-09-17, 76회차**. `written_at`이 찬 건 최근 4회차뿐이고
+  나머지는 원고에 그 줄이 없거나 재적재하지 않아서 비어 있다(정상)
 - 수급·금리 채워짐. 업종은 과거 회차에서 빈다(위 "시세 데이터 소스" 참고)
-- 자동 실행: **GitHub Actions `daily-update.yml`** — 회차별 3슬롯 (PC 전원 무관)
+- 자동 실행: **Vercel Cron → GitHub `workflow_dispatch`** (위 "정시 트리거" 절).
+  GitHub `schedule`은 백업 두 줄(11:40·20:40)만 남아 있다
 - 로컬 작업 스케줄러 `MarketBrief-Update`는 **비활성화됨** (중복 실행 방지, 되돌리기는 `/ENABLE`)
+
+### 손으로 트리거를 찔러 보는 법
+
+`CRON_SECRET`은 저장소에 없다. Vercel에서 꺼낸다.
+
+```bash
+vercel env pull --environment=production .env.production   # 값 확인용, 커밋 금지
+curl -H "Authorization: Bearer $CRON_SECRET"   "https://market-brief-xi.vercel.app/api/cron/dispatch?s=pm"
+```
+
+돌아오는 모양은 셋뿐이다.
+`{"skipped":"already-published"}` (러너를 안 깨움) · `{"dispatched":"daily-update.yml"}` (GitHub 런 생성) ·
+헤더 없으면 `401`. `?date=YYYY-MM-DD`로 날짜도 지정할 수 있다.
+
+### 배포 이력 (2026-09-17)
+
+| 커밋 | 내용 | 상태 |
+|---|---|---|
+| `3567fac` | 작성·게시 시각 화면 노출 + 정시 트리거를 Vercel Cron으로 교체 + `--skip-missing` | 배포됨 |
+
+이 배포에 밀려 있던 디자인 개편분(2026-09-15 작업)도 같이 올라갔다. 자동 배포는 여전히 꺼져 있다.
+
+라이브 확인 — 홈 마스트헤드 `프리마켓 | 원고 07:34 작성 | 10:21 게시`, `vercel crons ls`에 4줄,
+`/api/cron/dispatch` 세 경로(401 / 스킵 / dispatch) 기대대로, dispatch한 GitHub 런 success.
+
+**`vercel crons ls`가 배포 직후에도 `2 local changes pending deploy`를 띄운다. 무시해도 된다.**
+`?s=am` 두 줄, `?s=pm` 두 줄이 경로가 같아서 CLI가 짝을 잘못 맞춘 것이고, 위쪽에 찍히는
+등록된 목록은 `vercel.json`과 일치한다. 거슬리면 경로를 `?s=am&n=1`처럼 유일하게 만들면 없어진다.
 
 ### 배포 이력 (2026-09-15)
 
@@ -479,7 +510,7 @@ vercel deploy --prod
 
 ## 막힌 것
 
-**~~원본 리포트가 2026-09-08에서 끊겨 있다.~~ 2026-09-15에 재개됐다.** 09-15, 09-16 원고가
+**~~원본 리포트가 2026-09-08에서 끊겨 있다.~~ 2026-09-15에 재개됐다.** 09-15 ~ 09-17 원고가
 `../요약/뉴스/2026/09/` 에 있고 `stock-analysis`에도 푸시돼 있다. 09-09~09-12는 비어 있는 채로 남는다.
 원고가 없는 날은 실패가 아니라 스킵이다(위 "Actions 쪽 구성").
 
@@ -529,9 +560,10 @@ KRX가 풀리거나 다른 소스를 찾기 전까지 과거 회차의 업종은
 
 ## 다음 할 일
 
-1. `vercel deploy --prod` 한 번 — 작성 시각 표기, Vercel Cron 등록, 밀려 있던 디자인 개편분이
-   같이 올라간다. **먼저** `CRON_SECRET`과 `GH_DISPATCH_TOKEN`을 Production 환경변수에 넣을 것
-   (cron은 배포 시점에 등록된다)
+1. **2026-09-17 16:40 KST 이후 확인** — Vercel Cron의 첫 정시 실행이다. `/`에 그날 마감 종합판이
+   `원고 15:3x 작성 | 16:4x 게시`로 떠야 한다. 안 떴으면 Vercel → Cron Jobs 로그와
+   `gh run list --workflow=daily-update.yml` 순으로 본다.
+   (배포·환경변수는 끝났다. `CRON_SECRET`·`GH_DISPATCH_TOKEN` 모두 Production에 들어가 있다)
 2. KRX OPEN API 키 발급 → 업종지수 과거 조회 가능 여부 확정 (위 절차 ①②)
 4. 유료 전환 준비는 `docs/유료전환_법적요건.md` 참고 — 사업자등록 → 구매안전서비스 확인증
    → 통신판매업 신고 → 처리방침·약관 게시 → 푸터 표시 항목 추가 → PG 연동 → 해지·환불 화면 순서.
