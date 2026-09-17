@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: #FBFAF7; color: #14161A;
+    font-family: "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+    font-size: 15px; line-height: 1.7; font-weight: 400;
+    -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+  a { color: inherit; text-decoration: none; }
+  a:hover { color: #1B4D3E; }
+  [id] { scroll-margin-top: 4.5rem; }
+</style>
+</helmet>
+
+<div style="background:#FBFAF7; min-height:100vh">
+
+  <div style="position:sticky; top:0; z-index:10; background:rgba(251,250,247,0.94); backdrop-filter:blur(8px); border-bottom:1px solid #14161A">
+    <div style="margin:0 auto; max-width:900px; padding:11px clamp(20px,4vw,40px); display:flex; flex-wrap:wrap; align-items:baseline; gap:8px 24px">
+      <a href="#" style="font-size:14px; font-weight:700; letter-spacing:-0.01em; white-space:nowrap">시황 브리핑</a>
+      <nav style="display:flex; flex-wrap:wrap; gap:18px; font-size:12.5px; color:#6E7276">
+        <a href="#" style="color:#14161A; font-weight:500">오늘</a>
+        <a href="#">지난 브리핑</a>
+        <a href="#">면책</a>
+        <a href="#">처리방침</a>
+      </nav>
+      <span style="margin-left:auto; font-size:11.5px; letter-spacing:0.08em; color:#8C9095; white-space:nowrap">종목 추천 없음</span>
+    </div>
+  </div>
+
+  <div style="margin:0 auto; max-width:1120px; padding:0 clamp(20px,4vw,40px) 80px; display:flex; flex-wrap:wrap; align-items:flex-start; gap:0 clamp(28px,4vw,56px)">
+
+   <nav ref="{{ railRef }}" aria-label="목차" style="flex:0 1 170px; min-width:150px; position:sticky; top:66px; padding:clamp(40px,6vw,72px) 0 24px">
+     <p style="margin:0 0 12px; font-size:11.5px; font-weight:600; letter-spacing:0.14em; color:#A4A8AC">목차</p>
+     <a data-sec="indices" href="#indices" style="display:flex; gap:10px; border-left:1px solid #DCD9D2; padding:5px 0 5px 12px; font-size:13px; color:#6E7276"><span style="color:#A4A8AC">01</span>지수</a>
+     <a data-sec="macro" href="#macro" style="display:flex; gap:10px; border-left:1px solid #DCD9D2; padding:5px 0 5px 12px; font-size:13px; color:#6E7276"><span style="color:#A4A8AC">02</span>금리·환율</a>
+     <a data-sec="flows" href="#flows" style="display:flex; gap:10px; border-left:1px solid #DCD9D2; padding:5px 0 5px 12px; font-size:13px; color:#6E7276"><span style="color:#A4A8AC">03</span>수급</a>
+     <a data-sec="sectors" href="#sectors" style="display:flex; gap:10px; border-left:1px solid #DCD9D2; padding:5px 0 5px 12px; font-size:13px; color:#6E7276"><span style="color:#A4A8AC">04</span>업종 강약</a>
+     <a data-sec="recent" href="#recent" style="display:flex; gap:10px; border-left:1px solid #DCD9D2; padding:5px 0 5px 12px; font-size:13px; color:#6E7276"><span style="color:#A4A8AC">05</span>지난 브리핑</a>
+     <p style="margin:18px 0 0; padding-left:13px; font-size:11.5px; line-height:1.7; color:#C2C0BA">2026.09.15<br />제44회</p>
+   </nav>
+
+   <div style="flex:1 1 560px; min-width:0">
+
+    <header style="padding:clamp(40px,6vw,72px) 0 clamp(28px,4vw,40px)">
+      <div style="display:flex; flex-wrap:wrap; align-items:baseline; gap:10px 20px">
+        <span style="font-size:clamp(40px,7vw,68px); font-weight:300; letter-spacing:-0.045em; line-height:1">2026.09.15</span>
+        <span style="font-size:13px; letter-spacing:0.1em; color:#8C9095">화요일 · 장 마감 기준 · 제44회</span>
+      </div>
+      <h1 style="margin:clamp(20px,3vw,30px) 0 0; max-width:30ch; font-size:clamp(21px,2.8vw,29px); font-weight:600; line-height:1.42; letter-spacing:-0.03em; text-wrap:pretty; overflow-wrap:break-word">코스피 3.26% 급락, 외국인이 코스피에서 9,151억원 팔았다</h1>
+      <p style="margin:16px 0 0; max-width:60ch; font-size:15.5px; line-height:1.9; color:#4A4E52; text-wrap:pretty">미 국채 10년물이 4.96%까지 오르고 WTI가 2.96% 뛴 가운데 국내 지수는 동반 하락했다. 개인이 3,363억원을 받아냈고, VIX는 17.1로 7.95% 올랐다. 업종 등락률은 이 회차에서 집계되지 않았다.</p>
+    </header>
+
+    <section id="indices" style="display:flex; flex-wrap:wrap; gap:8px 28px; padding:26px 0; border-top:1px solid #14161A">
+      <div style="flex:0 0 130px; min-width:130px">
+        <p style="margin:0; font-size:12px; font-weight:600; letter-spacing:0.14em; color:#1B4D3E">01 지수</p>
+        <p style="margin:6px 0 0; font-size:11.5px; letter-spacing:0.06em; color:#A4A8AC">FinanceDataReader</p>
+      </div>
+      <div style="flex:1 1 380px; min-width:0">
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px; white-space:nowrap">코스피</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:15.5px; font-weight:500; letter-spacing:-0.01em; white-space:nowrap">6,684.37</span>
+          <span style="width:72px; text-align:right; font-size:13.5px; color:#1B5E9E; white-space:nowrap">-3.26%</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px; white-space:nowrap">코스닥</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:15.5px; font-weight:500; letter-spacing:-0.01em; white-space:nowrap">806.79</span>
+          <span style="width:72px; text-align:right; font-size:13.5px; color:#1B5E9E; white-space:nowrap">-1.69%</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px; white-space:nowrap">S&amp;P 500</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:15.5px; font-weight:500; letter-spacing:-0.01em; white-space:nowrap">7,619.98</span>
+          <span style="width:72px; text-align:right; font-size:13.5px; color:#1B5E9E; white-space:nowrap">-0.48%</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px; white-space:nowrap">나스닥 종합</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:15.5px; font-weight:500; letter-spacing:-0.01em; white-space:nowrap">26,186.41</span>
+          <span style="width:72px; text-align:right; font-size:13.5px; color:#1B5E9E; white-space:nowrap">-0.56%</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px; white-space:nowrap">다우존스 산업</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:15.5px; font-weight:500; letter-spacing:-0.01em; white-space:nowrap">52,421.20</span>
+          <span style="width:72px; text-align:right; font-size:13.5px; color:#1B5E9E; white-space:nowrap">-0.29%</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px; white-space:nowrap">러셀 2000</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:15.5px; font-weight:500; letter-spacing:-0.01em; white-space:nowrap">2,892.24</span>
+          <span style="width:72px; text-align:right; font-size:13.5px; color:#1B5E9E; white-space:nowrap">-0.40%</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px; white-space:nowrap">닛케이 225</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:15.5px; font-weight:500; letter-spacing:-0.01em; white-space:nowrap">63,492.99</span>
+          <span style="width:72px; text-align:right; font-size:13.5px; color:#1B5E9E; white-space:nowrap">-0.81%</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0">
+          <span style="font-size:14.5px; white-space:nowrap">상하이 종합</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:15.5px; font-weight:500; letter-spacing:-0.01em; white-space:nowrap">3,885.33</span>
+          <span style="width:72px; text-align:right; font-size:13.5px; color:#1B5E9E; white-space:nowrap">-0.07%</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="macro" style="display:flex; flex-wrap:wrap; gap:8px 28px; padding:26px 0; border-top:1px solid #DCD9D2">
+      <div style="flex:0 0 130px; min-width:130px">
+        <p style="margin:0; font-size:12px; font-weight:600; letter-spacing:0.14em; color:#1B4D3E">02 금리·환율</p>
+        <p style="margin:6px 0 0; font-size:11.5px; letter-spacing:0.06em; color:#A4A8AC">원자재 포함</p>
+      </div>
+      <div style="flex:1 1 380px; min-width:0">
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px">미 국채 10년물 금리</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:15.5px; font-weight:500; white-space:nowrap">4.96<span style="font-size:12px; color:#8C9095"> %</span></span>
+          <span style="width:72px; text-align:right; font-size:13.5px; color:#A32D22; white-space:nowrap">+0.20%</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px">미 국채 2년물 금리</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:15.5px; font-weight:500; white-space:nowrap">4.63<span style="font-size:12px; color:#8C9095"> %</span></span>
+          <span style="width:72px; text-align:right; font-size:13.5px; color:#A32D22; white-space:nowrap">+1.54%</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px">달러인덱스</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:15.5px; font-weight:500; white-space:nowrap">99.593<span style="font-size:12px; color:#8C9095"> pt</span></span>
+          <span style="width:72px; text-align:right; font-size:13.5px; color:#A32D22; white-space:nowrap">+0.13%</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px">원/달러 환율</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:15.5px; font-weight:500; white-space:nowrap">1,344.64<span style="font-size:12px; color:#8C9095"> 원</span></span>
+          <span style="width:72px; text-align:right; font-size:13.5px; color:#1B5E9E; white-space:nowrap">-0.26%</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px">엔/달러 환율</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:15.5px; font-weight:500; white-space:nowrap">153.424<span style="font-size:12px; color:#8C9095"> 엔</span></span>
+          <span style="width:72px; text-align:right; font-size:13.5px; color:#1B5E9E; white-space:nowrap">-0.68%</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px">WTI 유가</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:15.5px; font-weight:500; white-space:nowrap">103.01<span style="font-size:12px; color:#8C9095"> USD</span></span>
+          <span style="width:72px; text-align:right; font-size:13.5px; color:#A32D22; white-space:nowrap">+2.96%</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px">브렌트유</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:15.5px; font-weight:500; white-space:nowrap">107.32<span style="font-size:12px; color:#8C9095"> USD</span></span>
+          <span style="width:72px; text-align:right; font-size:13.5px; color:#A32D22; white-space:nowrap">+2.59%</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px">금</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:15.5px; font-weight:500; white-space:nowrap">4,357.30<span style="font-size:12px; color:#8C9095"> USD</span></span>
+          <span style="width:72px; text-align:right; font-size:13.5px; color:#1B5E9E; white-space:nowrap">-1.17%</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px">VIX 변동성지수</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:15.5px; font-weight:500; white-space:nowrap">17.10<span style="font-size:12px; color:#8C9095"> pt</span></span>
+          <span style="width:72px; text-align:right; font-size:13.5px; color:#A32D22; white-space:nowrap">+7.95%</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0">
+          <span style="font-size:14.5px; color:#A4A8AC">국고채 3년물 금리</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:13px; color:#A4A8AC; white-space:nowrap">미수집</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="flows" style="display:flex; flex-wrap:wrap; gap:8px 28px; padding:26px 0; border-top:1px solid #DCD9D2">
+      <div style="flex:0 0 130px; min-width:130px">
+        <p style="margin:0; font-size:12px; font-weight:600; letter-spacing:0.14em; color:#1B4D3E">03 수급</p>
+        <p style="margin:6px 0 0; font-size:11.5px; letter-spacing:0.06em; color:#A4A8AC">투자주체별 순매수 · 억원</p>
+      </div>
+      <div style="flex:1 1 380px; min-width:0">
+        <p style="margin:0 0 4px; font-size:11.5px; font-weight:600; letter-spacing:0.12em; color:#8C9095">코스피</p>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px">외국인</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:17px; font-weight:500; letter-spacing:-0.01em; color:#1B5E9E; white-space:nowrap">-9,151</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px">기관</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:17px; font-weight:500; letter-spacing:-0.01em; color:#1B5E9E; white-space:nowrap">-2,037</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px">개인</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:17px; font-weight:500; letter-spacing:-0.01em; color:#A32D22; white-space:nowrap">+3,363</span>
+        </div>
+
+        <p style="margin:22px 0 4px; font-size:11.5px; font-weight:600; letter-spacing:0.12em; color:#8C9095">코스닥</p>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px">외국인</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:17px; font-weight:500; letter-spacing:-0.01em; color:#1B5E9E; white-space:nowrap">-70</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="font-size:14.5px">기관</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:17px; font-weight:500; letter-spacing:-0.01em; color:#A32D22; white-space:nowrap">+922</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:8px; padding:7px 0">
+          <span style="font-size:14.5px">개인</span>
+          <span style="flex:1; min-width:12px"></span>
+          <span style="font-size:17px; font-weight:500; letter-spacing:-0.01em; color:#1B5E9E; white-space:nowrap">-888</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="sectors" style="display:flex; flex-wrap:wrap; gap:8px 28px; padding:26px 0; border-top:1px solid #DCD9D2">
+      <div style="flex:0 0 130px; min-width:130px">
+        <p style="margin:0; font-size:12px; font-weight:600; letter-spacing:0.14em; color:#1B4D3E">04 업종 강약</p>
+      </div>
+      <div style="flex:1 1 380px; min-width:0">
+        <p style="margin:0; max-width:56ch; font-size:14.5px; line-height:1.85; color:#6E7276">이 회차에서는 집계되지 않았습니다. 추정값으로 채우지 않습니다.</p>
+      </div>
+    </section>
+
+    <section id="recent" style="display:flex; flex-wrap:wrap; gap:8px 28px; padding:26px 0; border-top:1px solid #DCD9D2">
+      <div style="flex:0 0 130px; min-width:130px">
+        <p style="margin:0; font-size:12px; font-weight:600; letter-spacing:0.14em; color:#1B4D3E">05 지난 브리핑</p>
+        <a href="#" style="display:inline-block; margin-top:6px; font-size:11.5px; color:#A4A8AC">전체 44회차 →</a>
+      </div>
+      <div style="flex:1 1 380px; min-width:0">
+        <a href="#" style="display:flex; align-items:baseline; gap:14px; padding:8px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="flex:0 0 78px; font-size:12.5px; color:#A4A8AC">09.14 월</span>
+          <span style="font-size:14.5px; line-height:1.6; text-wrap:pretty">코스피 사상 최고권 유지, 외국인 5거래일 연속 순매수</span>
+        </a>
+        <a href="#" style="display:flex; align-items:baseline; gap:14px; padding:8px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="flex:0 0 78px; font-size:12.5px; color:#A4A8AC">09.12 금</span>
+          <span style="font-size:14.5px; line-height:1.6; text-wrap:pretty">원/달러 1,340원대 진입, 금리 하락에 위험자산 강세</span>
+        </a>
+        <a href="#" style="display:flex; align-items:baseline; gap:14px; padding:8px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="flex:0 0 78px; font-size:12.5px; color:#A4A8AC">09.08 화</span>
+          <span style="font-size:14.5px; line-height:1.6; text-wrap:pretty">미 고용 둔화 확인, 국채 2년물 급락</span>
+        </a>
+        <a href="#" style="display:flex; align-items:baseline; gap:14px; padding:8px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="flex:0 0 78px; font-size:12.5px; color:#A4A8AC">09.07 월</span>
+          <span style="font-size:14.5px; line-height:1.6; text-wrap:pretty">유가 100달러 돌파, 에너지 가격 부담 재확대</span>
+        </a>
+        <a href="#" style="display:flex; align-items:baseline; gap:14px; padding:8px 0; border-bottom:1px dotted #D6D3CC">
+          <span style="flex:0 0 78px; font-size:12.5px; color:#A4A8AC">09.04 금</span>
+          <span style="font-size:14.5px; line-height:1.6; text-wrap:pretty">코스닥 약세 지속, 기관 순매도 확대</span>
+        </a>
+        <a href="#" style="display:flex; align-items:baseline; gap:14px; padding:8px 0">
+          <span style="flex:0 0 78px; font-size:12.5px; color:#A4A8AC">09.03 목</span>
+          <span style="font-size:14.5px; line-height:1.6; text-wrap:pretty">달러인덱스 반등, 아시아 통화 동반 약세</span>
+        </a>
+      </div>
+    </section>
+
+    <footer style="display:flex; flex-wrap:wrap; gap:8px 28px; padding:26px 0 0; border-top:1px solid #14161A">
+      <div style="flex:0 0 130px; min-width:130px">
+        <p style="margin:0; font-size:12.5px; font-weight:700; letter-spacing:-0.01em">시황 브리핑</p>
+        <nav style="display:flex; flex-direction:column; gap:3px; padding-top:10px; font-size:12px; color:#8C9095">
+          <a href="#">지난 브리핑</a>
+          <a href="#">면책</a>
+          <a href="#">처리방침</a>
+        </nav>
+      </div>
+      <div style="flex:1 1 380px; min-width:0">
+        <p style="margin:0; max-width:66ch; font-size:12.5px; line-height:1.9; color:#6E7276">지수 · 금리 · 환율 · 유가 · 투자주체별 수급 · 업종 강약만 다룹니다. 개별 종목, 관련주, 목표주가는 싣지 않습니다.</p>
+        <p style="margin:10px 0 0; max-width:66ch; font-size:12.5px; line-height:1.9; color:#A4A8AC">본 서비스는 개별 종목에 대한 투자자문·투자권유를 제공하지 않으며, 시장 전반의 통계와 해설만 제공합니다. 투자 판단과 그 결과는 이용자 본인에게 귀속됩니다.</p>
+      </div>
+    </footer>
+   </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  rail = React.createRef();
+  componentDidMount() {
+    const links = () => Array.from(this.rail.current?.querySelectorAll("[data-sec]") ?? []);
+    const paint = (id) => links().forEach((a) => {
+      const on = a.dataset.sec === id;
+      a.style.color = on ? "#1B4D3E" : "#6E7276";
+      a.style.fontWeight = on ? "600" : "400";
+      a.style.borderLeftColor = on ? "#1B4D3E" : "#DCD9D2";
+    });
+    const ids = ["indices", "macro", "flows", "sectors", "recent"];
+    const nodes = ids.map((i) => document.getElementById(i)).filter(Boolean);
+    paint("indices");
+    this.io = new IntersectionObserver((entries) => {
+      const vis = entries.filter((e) => e.isIntersecting)
+        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+      if (vis[0]) paint(vis[0].target.id);
+    }, { rootMargin: "-80px 0px -65% 0px", threshold: 0 });
+    nodes.forEach((n) => this.io.observe(n));
+  }
+  componentWillUnmount() { this.io?.disconnect(); }
+  renderVals() { return { railRef: this.rail }; }
+}
+</script>
+</body>
+</html>
