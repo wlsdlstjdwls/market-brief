@@ -9,7 +9,7 @@ interface Props {
     tradeDate: string;
     session: Session;
     runId: string;
-    /** 원고가 적어 둔 작성 기준시각. 그 줄이 없는 옛 회차는 null. */
+    /** 원고가 적어 둔 작성 기준시각. 지금은 화면에 찍지 않는다(DB에는 계속 쌓인다). */
     writtenAt?: Date | string | null;
     /** 이 사이트에 올라간 시각(적재 시각). 원고가 늦으면 작성 시각과 몇 시간 벌어진다. */
     publishedAt?: Date | string | null;
@@ -38,15 +38,6 @@ function weekday(date: string) {
   return Number.isNaN(d.getTime()) ? null : WEEKDAY[d.getDay()];
 }
 
-/**
- * run-1535 → "15:35". 회차 식별자에 시각이 박혀 있는 경우에만 쓴다.
- * 프리마켓판은 폴더에 시각이 없어(run-none) 표기를 생략한다.
- */
-function runTime(runId: string) {
-  const m = runId.match(/(\d{2})(\d{2})$/);
-  return m ? `${m[1]}:${m[2]}` : null;
-}
-
 /*
  * 시각 표기는 전부 KST로 고정한다. 서버(Vercel)는 UTC로 도는데 포맷터에 시간대를
  * 주지 않으면 화면의 "07:34"가 배포 환경마다 달라진다.
@@ -69,12 +60,6 @@ function toDate(v: Date | string | null | undefined): Date | null {
   if (!v) return null;
   const d = v instanceof Date ? v : new Date(v);
   return Number.isNaN(d.getTime()) ? null : d;
-}
-
-/** 2026-09-17T07:34+09:00 → "07:34" */
-function hm(v: Date | string | null | undefined) {
-  const d = toDate(v);
-  return d ? KST_HM.format(d) : null;
 }
 
 /**
@@ -347,12 +332,6 @@ export default function BriefView({
   }
 
   const day = weekday(brief.tradeDate);
-  /*
-   * 작성 시각은 원고가 적어 둔 기준시각이 1순위다(`> 작성 시각: 2026-09-17 07:34 KST`).
-   * 그 줄이 없는 옛 회차만 폴더명(run-1535)의 시각으로 떨어진다. 프리마켓판은
-   * 폴더에 시각이 없어(run-none) 여태 아무 시각도 뜨지 않았다.
-   */
-  const written = hm(brief.writtenAt) ?? runTime(brief.runId);
   const posted = postedLabel(brief.publishedAt, brief.tradeDate);
 
   return (
@@ -376,11 +355,10 @@ export default function BriefView({
           sessions={sessions}
         />
 
-        {/* 회차 / 원고 작성 시각 / 이 사이트에 올라간 시각. 셋을 따로 찍는다 —
-            원고가 늦게 나온 날은 작성과 게시가 몇 시간씩 벌어진다. */}
+        {/* 회차와 게시 시각만 찍는다. 원고 작성 시각은 사용자 지시로 뺐다(2026-09-17).
+            값은 daily_brief.written_at에 계속 쌓이므로 되살리려면 여기만 되돌리면 된다. */}
         <p className="edition">
           <span>{SESSION_LABEL[brief.session]}</span>
-          {written ? <span>원고 {written} 작성</span> : null}
           {posted ? <span>{posted}</span> : null}
         </p>
 

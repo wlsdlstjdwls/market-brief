@@ -97,15 +97,19 @@ KRX(data.krx.co.kr)가 이 PC의 IP를 차단한다. 응답이 JSON이 아니라
 
 **원고를 쓴 시각과 사이트에 올라간 시각은 다르다.** 09-17 프리마켓판이 07:34에 쓰였는데
 화면에는 10:21에야 떴다(08:10 슬롯이 또 밀렸다). 아침에 보면 없고 낮에 보면 있으니
-독자가 "글이 언제 것인지" 알 방법이 없었다. 그래서 마스트헤드에 둘 다 찍는다.
+독자가 "글이 언제 것인지" 알 방법이 없었다. 그래서 마스트헤드에 게시 시각을 찍는다.
 
-    프리마켓 | 원고 07:34 작성 | 10:21 게시
+    프리마켓 | 10:21 게시
+
+**원고 작성 시각은 화면에서 뺐다**(같은 날 사용자 지시, "게시만 필요"). 값은 `written_at`에
+계속 쌓이므로 되살리려면 `BriefView.tsx`의 `.edition` 한 줄만 되돌리면 된다.
 
 - `daily_brief.written_at` — 원고 머리의 `> 작성 시각: 2026-09-17 07:34 KST`를 그대로 담는다.
+  지금은 화면에 찍지 않지만 회차 판정(am/pm)이 이 값을 쓰므로 수집은 계속한다.
   `ingest.ts`의 `writtenAt()`이 ISO(`...T07:34:00+09:00`)로 만들어 넘긴다. **여기서 읽는 건
   시각뿐이다.** 시장 수치는 여전히 원문에서 읽지 않는다.
-- 그 줄이 없는 옛 회차(2026-08-26 이전)는 `written_at`이 비고, 화면은 폴더명(`run-1535`)의
-  시각으로 떨어진다. 프리마켓판은 폴더에 시각이 없어(`run-none`) 여태 아무 시각도 안 떴다.
+- 그 줄이 없는 옛 회차(2026-08-26 이전)는 `written_at`이 빈다. 회차 판정은 폴더명(`run-1535`)의
+  시각으로 떨어진다.
 - **`published_at`은 첫 값을 지킨다.** `persist.ts`의 upsert가
   `COALESCE(daily_brief.published_at, excluded.published_at)`로 덮는다. 재시도 슬롯이 회차마다
   세 번 도는데 그때마다 갱신되면 "게시" 시각이 실제 발행 시각이 아니라 마지막 재적재 시각이 된다.
@@ -335,7 +339,7 @@ curl -H "Authorization: Bearer $CRON_SECRET"   "https://market-brief-xi.vercel.a
 
 이 배포에 밀려 있던 디자인 개편분(2026-09-15 작업)도 같이 올라갔다. 자동 배포는 여전히 꺼져 있다.
 
-라이브 확인 — 홈 마스트헤드 `프리마켓 | 원고 07:34 작성 | 10:21 게시`, `vercel crons ls`에 4줄,
+라이브 확인 — 홈 마스트헤드 `프리마켓 | 10:21 게시`, `vercel crons ls`에 4줄,
 `/api/cron/dispatch` 세 경로(401 / 스킵 / dispatch) 기대대로, dispatch한 GitHub 런 success.
 
 **`vercel crons ls`가 배포 직후에도 `2 local changes pending deploy`를 띄운다. 무시해도 된다.**
@@ -561,7 +565,7 @@ KRX가 풀리거나 다른 소스를 찾기 전까지 과거 회차의 업종은
 ## 다음 할 일
 
 1. **2026-09-17 16:40 KST 이후 확인** — Vercel Cron의 첫 정시 실행이다. `/`에 그날 마감 종합판이
-   `원고 15:3x 작성 | 16:4x 게시`로 떠야 한다. 안 떴으면 Vercel → Cron Jobs 로그와
+   `마감 종합 | 16:4x 게시`로 떠야 한다. 안 떴으면 Vercel → Cron Jobs 로그와
    `gh run list --workflow=daily-update.yml` 순으로 본다.
    (배포·환경변수는 끝났다. `CRON_SECRET`·`GH_DISPATCH_TOKEN` 모두 Production에 들어가 있다)
 2. KRX OPEN API 키 발급 → 업종지수 과거 조회 가능 여부 확정 (위 절차 ①②)
