@@ -4,6 +4,7 @@
  *   npm run ingest -- --date 2026-09-08    특정 일자
  *   npm run ingest -- --publish            검사 통과 시 published 상태로 적재
  *   npm run ingest -- --session am         그 날짜의 오전(프리마켓)판만
+ *   npm run ingest -- --skip-missing       지정한 회차가 아직 없으면 실패 대신 스킵 (자동 실행용)
  *
  * 세션을 지정하지 않으면 그날 있는 회차를 전부 적재한다(오전판 + 오후판).
  *
@@ -32,6 +33,8 @@ interface Run {
   tradeDate: string;
   runId: string;
   session: BriefSession;
+  /** 원고 머리의 작성 기준시각 (ISO). 그 줄이 없는 옛 회차는 null. */
+  writtenAt: string | null;
 }
 
 /**
@@ -39,16 +42,25 @@ interface Run {
  * 2026-09-15 회차처럼 `> 작성 시각: ...`로 쓴 날도 있다. 둘 다 받는다.
  * 여기서 뽑는 건 시각뿐이다. 시장 수치는 원문에서 절대 읽지 않는다(fetch_market.py 담당).
  */
-function writtenAt(dir: string): number | null {
+function writtenAt(dir: string): string | null {
   for (const name of SOURCE_ALLOW) {
     const p = join(dir, name);
     if (!existsSync(p)) continue;
     const head = readFileSync(p, "utf8").slice(0, 2000);
     // 표기가 회차마다 흔들린다. "작성 기준시각"과 "작성 시각"을 둘 다 받는다.
-    const m = head.match(/작성\s*(?:기준)?\s*시각[^0-9]*\d{4}-\d{2}-\d{2}\s+(\d{1,2}):(\d{2})/);
-    if (m) return Number(m[1]) * 100 + Number(m[2]);
+    const m = head.match(
+      /작성\s*(?:기준)?\s*시각[^0-9]*(\d{4}-\d{2}-\d{2})\s+(\d{1,2}):(\d{2})/,
+    );
+    // 원고는 전부 KST로 적는다. 오프셋을 박아 둬야 서버 시간대와 무관하게 같은 시각이 된다.
+    if (m) return `${m[1]}T${m[2].padStart(2, "0")}:${m[3]}:00+09:00`;
   }
   return null;
+}
+
+/** 작성 기준시각을 HHMM 정수로. 회차(am/pm) 판정에만 쓴다. */
+function hhmmOf(iso: string | null): number | null {
+  const m = iso?.match(/T(\d{2}):(\d{2})/);
+  return m ? Number(m[1]) * 100 + Number(m[2]) : null;
 }
 
 /**
@@ -60,7 +72,8 @@ function writtenAt(dir: string): number | null {
  * (run-HHMM/이 따로 있으면 루트에 남은 쪽이 오전판) — findRuns가 fallback으로 넘긴다.
  */
 function sessionOf(dir: string, runId: string, fallback: BriefSession = "pm"): BriefSession {
-  const hhmm = writtenAt(dir) ?? (/\d/.test(runId) ? Number(runId.replace(/\D/g, "")) : NaN);
+  const hhmm =
+    hhmmOf(writtenAt(dir)) ?? (/\d/.test(runId) ? Number(runId.replace(/\D/g, "")) : NaN);
   if (!Number.isFinite(hhmm)) return fallback;
   return hhmm < 1200 ? "am" : "pm";
 }
@@ -108,10 +121,15 @@ function findRuns(date?: string): Run[] {
     found.push({
       dir: dayDir, tradeDate, runId: "run-none",
       session: sessionOf(dayDir, "run-none", fallback),
+      writtenAt: writtenAt(dayDir),
     });
   }
   for (const r of runDirs) {
-    found.push({ dir: r.dir, tradeDate, runId: r.name, session: sessionOf(r.dir, r.name) });
+    found.push({
+      dir: r.dir, tradeDate, runId: r.name,
+      session: sessionOf(r.dir, r.name),
+      writtenAt: writtenAt(r.dir),
+    });
   }
   if (!found.length) throw new Error(`${tradeDate}에 허용된 원본이 없습니다.`);
 
@@ -160,7 +178,10 @@ function narrativeOf(p: BriefPayload) {
 const SESSION_KO: Record<BriefSession, string> = { am: "프리마켓", pm: "마감 종합" };
 
 function report(p: BriefPayload) {
-  console.log(`\n■ ${p.tradeDate} / ${SESSION_KO[p.session]} / ${p.runId}`);
+  console.log(
+    `\n■ ${p.tradeDate} / ${SESSION_KO[p.session]} / ${p.runId}` +
+      (p.writtenAt ? ` / 원고 작성 ${p.writtenAt.slice(11, 16)} KST` : " / 원고 작성시각 없음"),
+  );
   console.log(`  헤드라인 : ${p.headline}`);
   console.log(`  지수 ${p.indices.length} / 지표 ${p.macros.length} / 수급 ${p.flows.length} / 섹터 ${p.sectors.length}`);
   for (const i of p.indices) console.log(`    [지수] ${i.indexName} ${i.close ?? "-"} (${i.changePct ?? "-"}%)`);
@@ -193,6 +214,7 @@ async function ingestOne(run: Run): Promise<number | null> {
     run.runId,
     readMarket(run.tradeDate, run.session),
     run.session,
+    run.writtenAt,
   );
   report(payload);
 
@@ -237,7 +259,15 @@ async function main() {
   const runs = want ? all.filter((r) => r.session === want) : all;
   if (!runs.length) {
     const date = all[0]?.tradeDate ?? opt("date");
-    console.error(`${date}에 ${want} 회차가 없습니다. (있는 회차: ${all.map((r) => r.session).join(", ")})`);
+    const msg = `${date}에 ${want} 회차가 없습니다. (있는 회차: ${all.map((r) => r.session).join(", ")})`;
+    // 자동 실행은 "아직 안 쓴 회차"를 실패로 치면 안 된다. 오전에 am만 있는 날
+    // pm 슬롯이 돌면 늘 여기로 오는데, 그건 정상이지 사고가 아니다.
+    // 손으로 돌릴 때는 회차를 잘못 적은 것일 수 있으므로 그대로 실패시킨다.
+    if (flag("skip-missing")) {
+      console.log(`${msg} — 건너뜁니다.`);
+      return;
+    }
+    console.error(msg);
     process.exit(2);
   }
   if (!want && all.length > 1) {

@@ -240,11 +240,21 @@ a:hover {
 }
 
 /* 지금 보고 있는 회차와 기준시각. 탭이 없는 날에도 뜬다. */
+/* 회차, 원고 작성 시각, 게시 시각을 한 줄에 나란히.
+   가운뎃점 대신 세로 헤어라인으로 가른다(가운뎃점은 이 사이트에서 쓰지 않는다). */
 .edition {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 13px;
   margin: 14px 0 0;
   font-size: 12.5px;
   letter-spacing: 0.02em;
   color: var(--faint);
+}
+
+.edition > span + span {
+  padding-left: 13px;
+  border-left: 1px solid var(--line);
 }
 
 .tabs + .edition {

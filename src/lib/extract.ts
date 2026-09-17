@@ -45,6 +45,12 @@ export interface BriefPayload {
   /** am = 프리마켓(07:4x), pm = 마감 종합(15:3x). 같은 날짜에 둘 다 있을 수 있다. */
   session: BriefSession;
   runId: string;
+  /**
+   * 원고가 적어 둔 작성 기준시각 (ISO, 예: 2026-09-17T07:34:00+09:00).
+   * 원고 머리의 `> 작성 시각:` 줄에서만 온다. 그 줄이 없는 옛 회차는 null.
+   * 시각만 읽는다 — 시장 수치는 원문에서 절대 읽지 않는다.
+   */
+  writtenAt: string | null;
   headline: string;
   summary: string;
   macroCommentary: string;
@@ -191,7 +197,8 @@ export function buildPayload(
   tradeDate: string,
   runId: string,
   market: MarketData = { tradeDate },
-  session: BriefSession = "pm"
+  session: BriefSession = "pm",
+  writtenAt: string | null = null
 ): BriefPayload {
   for (const name of Object.keys(files)) assertAllowedSource(name);
 
@@ -236,6 +243,7 @@ export function buildPayload(
     tradeDate,
     session,
     runId,
+    writtenAt,
     headline,
     summary: leadText || krParas[0] || macroParas[0] || "",
     macroCommentary: macroParas.join("\n\n"),

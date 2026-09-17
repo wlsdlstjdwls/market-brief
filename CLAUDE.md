@@ -31,6 +31,7 @@
 | `src/db/schema.ts` | Drizzle 스키마 8테이블 |
 | `scripts/add-brief-topic.ts` | `brief_topic` 테이블 추가 SQL (1회성, 아무것도 지우지 않음) |
 | `scripts/add-session.ts` | `daily_brief.session` 추가 + 유니크 키 교체 (1회성, 2026-09-15 적용 완료) |
+| `scripts/add-written-at.ts` | `daily_brief.written_at` 추가 (1회성, 2026-09-17 적용 완료, 아무것도 지우지 않음) |
 | `scripts/fetch_market.py` | 실제 시세 수집 → `data/market/{날짜}.json` |
 | `scripts/ingest.ts` | 적재 CLI |
 | `scripts/verify.ts` | 발행 결과 검증 (DB / 저장한 HTML) |
@@ -38,6 +39,7 @@
 | `scripts/update_web.bat` | 일일 갱신 (수집 → 적재 → 검증). 작업 스케줄러가 부른다 |
 | `scripts/install_update_web_task.bat` | 위 작업을 평일 16:10에 등록 |
 | `scripts/backfill.py` | 과거 회차 일괄 적재 |
+| `src/app/api/cron/dispatch/route.ts` | Vercel Cron이 때리는 트리거. GitHub 워크플로를 workflow_dispatch로 깨운다 |
 
 배치 파일은 ASCII로만 쓴다. cmd.exe가 한글 배치 텍스트를 깨뜨려 실행 자체가 실패한다
 (기존 `../*.bat`들도 전부 영문인 이유다). 설명은 이 문서에 쓴다.
@@ -91,6 +93,29 @@ KRX(data.krx.co.kr)가 이 PC의 IP를 차단한다. 응답이 JSON이 아니라
 - 아카이브와 "지난 브리핑" 목록은 날짜당 한 줄이다(마감 종합 우선). 탭이 안에 있으니
   목록까지 두 줄로 늘릴 이유가 없다.
 
+### 작성 시각 표기 (2026-09-17 추가)
+
+**원고를 쓴 시각과 사이트에 올라간 시각은 다르다.** 09-17 프리마켓판이 07:34에 쓰였는데
+화면에는 10:21에야 떴다(08:10 슬롯이 또 밀렸다). 아침에 보면 없고 낮에 보면 있으니
+독자가 "글이 언제 것인지" 알 방법이 없었다. 그래서 마스트헤드에 둘 다 찍는다.
+
+    프리마켓 | 원고 07:34 작성 | 10:21 게시
+
+- `daily_brief.written_at` — 원고 머리의 `> 작성 시각: 2026-09-17 07:34 KST`를 그대로 담는다.
+  `ingest.ts`의 `writtenAt()`이 ISO(`...T07:34:00+09:00`)로 만들어 넘긴다. **여기서 읽는 건
+  시각뿐이다.** 시장 수치는 여전히 원문에서 읽지 않는다.
+- 그 줄이 없는 옛 회차(2026-08-26 이전)는 `written_at`이 비고, 화면은 폴더명(`run-1535`)의
+  시각으로 떨어진다. 프리마켓판은 폴더에 시각이 없어(`run-none`) 여태 아무 시각도 안 떴다.
+- **`published_at`은 첫 값을 지킨다.** `persist.ts`의 upsert가
+  `COALESCE(daily_brief.published_at, excluded.published_at)`로 덮는다. 재시도 슬롯이 회차마다
+  세 번 도는데 그때마다 갱신되면 "게시" 시각이 실제 발행 시각이 아니라 마지막 재적재 시각이 된다.
+- 게시일이 거래일과 다르면 날짜를 같이 찍는다(`09.18 01:12 게시`). 과거 회차 일괄 적재분이
+  그렇다.
+- 시각 포맷은 `Intl`에 `timeZone: "Asia/Seoul"`을 박아 고정한다. Vercel 서버는 UTC로 돈다.
+- **과거 회차를 채우려고 `backfill.py`를 다시 돌리지 말 것.** `written_at`은 채워지지만
+  옛 회차의 `published_at`은 이미 일괄 적재 시각(2026-09-15)이라 얻는 게 없다. 09-15~09-17만
+  손으로 재적재해 채웠다.
+
 ### 차단 4중 방어
 
 1. 파일 — `종목뉴스.md` 투입 거부 (`assertAllowedSource`)
@@ -111,6 +136,7 @@ npm run ingest -- --dry-run  # DB 없이 적재 결과 미리보기
 npm run verify               # DB의 published 브리핑 검사
 
 npm run ingest -- --date 2026-09-08 --session am --dry-run   # 오전판만 미리보기
+npm run ingest -- --session pm --skip-missing --publish       # 그 회차가 아직 없으면 실패 대신 스킵
 
 python scripts/fetch_market.py 2026-09-14   # 시세 수집 (장 마감 후)
 python scripts/backfill.py --dry-run        # 과거 회차 대상 날짜만 확인
@@ -131,7 +157,7 @@ npx tsx --env-file=.env.local scripts/ingest.ts --date 2026-09-08 --publish
 | | GitHub Actions (권장) | 로컬 작업 스케줄러 |
 |---|---|---|
 | 정의 | `.github/workflows/daily-update.yml` | `MarketBrief-Update` → `scripts/update_web.bat` |
-| 시각 | 평일 08:10·09:40·11:40 / 16:40·18:40·20:40 KST (회차별 3슬롯) | 평일 16:10 |
+| 시각 | 정시분은 Vercel Cron이 부른다(08:10·09:40 / 16:40·18:40). 워크플로 자체 schedule은 백업 11:40·20:40 | 평일 16:10 |
 | PC 전원 | 무관 | **켜져 있고 로그인돼 있어야 함** (`Logon Mode: Interactive only`) |
 | 로그 | Actions 탭 + Step Summary | `data/logs/update_web.log` |
 
@@ -149,6 +175,51 @@ npx tsx --env-file=.env.local scripts/ingest.ts --date 2026-09-08 --publish
 16:40인 이유는 오후 원고의 **커밋 시각이 15:53~16:18**로 퍼져 있어서다. 16:10으로 잡으면
 2026-08-10 같은 날(16:18 커밋)을 놓친다. 장 마감 15:30 + 업종 스냅샷 인정 시각 15:40 이후이고,
 상위 저장소의 `SimpleStock-Report-PM`(16:00)과도 겹치지 않는다. 더 앞으로 당기지 말 것.
+
+### 정시 트리거는 Vercel Cron이 맡는다 (2026-09-17 교체)
+
+**GitHub `schedule`을 정시 수단으로 믿을 수 없다.** 실측 지연(2026-09-16~17):
+
+| 예정(UTC) | 실제 | 지연 |
+|---|---|---|
+| 09-16 23:10 | 09-17 01:20 | 2시간 10분 |
+| 09-16 09:40 | 09-16 12:47 | 3시간 07분 |
+| 09-16 02:40 | 09-16 05:12 | 2시간 32분 |
+| 09-16 07:40 | 09-16 07:53 | 13분 |
+
+같은 워크플로라도 `workflow_dispatch`로 부르면 대기열 없이 즉시 뜬다(09-15 수동 실행 2건 확인).
+그래서 **정시에 부르는 일만 Vercel Cron으로 넘겼다.** 적재는 그대로 GitHub에서 돈다.
+
+    Vercel Cron → GET /api/cron/dispatch?s=am → GitHub workflow_dispatch → daily-update.yml
+
+- **Vercel Pro라서 가능하다.** Hobby cron은 하루 1회 + 정밀도 ±59분이라 이 구조가 성립하지 않는다.
+  Pro는 최소 간격 1분, 분 단위 정밀도다.
+- **적재를 Vercel로 옮긴 게 아니다.** `ingest.ts`가 `readdirSync`로 원고 폴더를 훑고
+  `fetch_market.py`가 파이썬이라 Vercel 함수에서 돌 수 없다. 이 라우트는 호출만 한다.
+- 라우트가 **DB를 먼저 보고 이미 published면 부르지 않는다.** 워크플로 안에도 같은 검사가
+  있지만 그건 체크아웃까지 다 한 뒤다. 러너를 안 깨우는 편이 싸다.
+- `Authorization: Bearer $CRON_SECRET` 없으면 401이다. Vercel이 cron 호출에 이 헤더를 자동으로 싣는다.
+
+| 회차 | Vercel cron (UTC) | KST | |
+|---|---|---|---|
+| `am` | `10 23 * * 0-4` | 08:10 | 첫 시도 |
+| `am` | `40 0 * * 1-5` | 09:40 | 재시도 |
+| `pm` | `40 7 * * 1-5` | 16:40 | 첫 시도 |
+| `pm` | `40 9 * * 1-5` | 18:40 | 재시도 |
+
+**GitHub `schedule`은 백업 두 줄만 남겼다** — 11:40(am), 20:40(pm). Vercel 쪽이 통째로 죽은
+날의 그물이다. 늦어도 상관없는 자리라 GitHub 지연이 문제가 되지 않는다.
+
+필요한 Vercel 환경변수 (Production):
+
+| 이름 | 용도 |
+|---|---|
+| `CRON_SECRET` | Vercel이 cron 호출에 싣는 Bearer 토큰. 이게 없으면 라우트는 401만 낸다 |
+| `GH_DISPATCH_TOKEN` | fine-grained PAT. `wlsdlstjdwls/market-brief` 하나에만, Actions read/write만 |
+| `GH_REPO` | 선택. 기본값 `wlsdlstjdwls/market-brief` |
+
+**cron은 프로덕션 배포에만 등록된다.** `vercel.json`을 고쳤으면 `vercel deploy --prod`를 해야
+스케줄이 바뀐다. 푸시는 여전히 배포가 아니다(`git.deploymentEnabled: false`).
 
 ### 재시도 슬롯을 둔 이유 (2026-09-16)
 
@@ -168,11 +239,10 @@ npx tsx --env-file=.env.local scripts/ingest.ts --date 2026-09-08 --publish
 `persist.ts`가 upsert라 다시 넣어도 결과는 같지만, 도는 김에 원고를 다시 읽을 이유가 없다.
 회차를 지정하지 않은 수동 실행은 항상 `false`가 나와 그대로 진행한다.
 
-**Vercel Cron으로 갈아타지 않았다.** 스케줄러만 바꿔서 해결되는 문제가 아니다.
-`ingest.ts`가 `readFileSync`/`readdirSync`로 원고 폴더를 훑는데 Vercel 함수에는 그 파일이 없다.
-private인 `stock-analysis`를 GitHub API로 받아 오는 로더를 새로 쓰고 토큰을 하나 더 들여야 하며,
-Hobby 플랜 cron은 하루 한 번 + 시각이 대략치라 `am`/`pm` 두 회차와 15:40 제약을 못 맞춘다.
-Vercel을 꼭 쓰려면 적재를 옮기지 말고 **`workflow_dispatch`를 때리는 트리거로만** 쓰는 편이 낫다.
+**~~Vercel Cron으로 갈아타지 않았다.~~ 2026-09-17에 트리거만 갈아탔다** (위 절 참고).
+적재를 옮긴 게 아니라 "정시에 부르는 일"만 넘겼다. 적재를 Vercel로 옮기는 건 여전히 안 한다 —
+`ingest.ts`가 `readFileSync`/`readdirSync`로 원고 폴더를 훑는데 Vercel 함수에는 그 파일이 없고,
+private인 `stock-analysis`를 GitHub API로 받아 오는 로더를 새로 써야 하며, 시세 수집은 파이썬이다.
 
 수동 실행(`workflow_dispatch`)은 날짜와 회차를 골라 넣을 수 있다. 회차를 비우면 그날 있는 것을 전부 적재한다.
 
@@ -196,6 +266,12 @@ Vercel을 꼭 쓰려면 적재를 옮기지 말고 **`workflow_dispatch`를 때�
 
 원고가 없는 날(공휴일·루틴 미실행)은 **실패가 아니다.** 적재 step들을 건너뛰고
 Step Summary에 "원고 없음, 스킵"만 남기고 정상 종료한다. 실패 알림도 가지 않는다.
+
+**그 날짜 폴더는 있는데 그 회차만 없는 경우도 실패가 아니다.** 오전에 `am`만 나온 날
+`pm` 슬롯이 돌면 늘 이 경우다. 워크플로의 "원고 존재 확인"은 날짜 폴더만 보므로 여기서
+걸러지지 않고 `ingest.ts`까지 들어간다. 그래서 자동 실행은 `--skip-missing`을 달고 부른다
+(2026-09-17에 Vercel Cron 전환을 테스트하다 실패 알림으로 드러났다). 손으로 돌릴 때는
+회차를 잘못 적은 것일 수 있으므로 플래그 없이 그대로 실패시킨다.
 
 `python scripts/fetch_market.py`의 의존성은 `scripts/requirements.txt`에 있다. 로컬도 같은 파일을 쓴다.
 
@@ -453,9 +529,11 @@ KRX가 풀리거나 다른 소스를 찾기 전까지 과거 회차의 업종은
 
 ## 다음 할 일
 
-1. 디자인 개편분 배포 (`vercel deploy --prod`) — 로컬 검증까지만 끝났다
+1. `vercel deploy --prod` 한 번 — 작성 시각 표기, Vercel Cron 등록, 밀려 있던 디자인 개편분이
+   같이 올라간다. **먼저** `CRON_SECRET`과 `GH_DISPATCH_TOKEN`을 Production 환경변수에 넣을 것
+   (cron은 배포 시점에 등록된다)
 2. KRX OPEN API 키 발급 → 업종지수 과거 조회 가능 여부 확정 (위 절차 ①②)
-3. 유료 전환 준비는 `docs/유료전환_법적요건.md` 참고 — 사업자등록 → 구매안전서비스 확인증
+4. 유료 전환 준비는 `docs/유료전환_법적요건.md` 참고 — 사업자등록 → 구매안전서비스 확인증
    → 통신판매업 신고 → 처리방침·약관 게시 → 푸터 표시 항목 추가 → PG 연동 → 해지·환불 화면 순서.
    종목을 안 넣는 한 유사투자자문업 신고는 해당 없음
 

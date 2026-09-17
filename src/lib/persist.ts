@@ -1,5 +1,5 @@
 /** 브리핑 페이로드를 Neon에 적재한다. 적재 직전에 한 번 더 검사한다. */
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "../db/index";
 import {
   dailyBrief, marketIndex, macroIndicator, investorFlow, sectorIndex, briefTopic,
@@ -41,6 +41,8 @@ export async function persist(p: BriefPayload, publish: boolean): Promise<number
     tradeDate: p.tradeDate,
     session: p.session,
     runId: p.runId,
+    // 원고가 적어 둔 작성 기준시각. 없는 회차는 null로 들어간다(옛 원고에는 그 줄이 없다).
+    writtenAt: p.writtenAt ? new Date(p.writtenAt) : null,
     headline: p.headline,
     summary: p.summary,
     macroCommentary: p.macroCommentary,
@@ -54,7 +56,15 @@ export async function persist(p: BriefPayload, publish: boolean): Promise<number
     .insert(dailyBrief)
     .values(values)
     // 같은 날짜라도 am/pm은 별개 행이다. 같은 (날짜, 세션)을 다시 넣으면 덮어쓴다.
-    .onConflictDoUpdate({ target: [dailyBrief.tradeDate, dailyBrief.session], set: values })
+    // published_at만은 처음 값을 지킨다. 재시도 슬롯이 하루 세 번 도는데 그때마다
+    // 갱신되면 화면의 "게시" 시각이 실제로 올라간 시각이 아니라 마지막 재적재 시각이 된다.
+    .onConflictDoUpdate({
+      target: [dailyBrief.tradeDate, dailyBrief.session],
+      set: {
+        ...values,
+        publishedAt: sql`COALESCE(${dailyBrief.publishedAt}, ${values.publishedAt})`,
+      },
+    })
     .returning({ id: dailyBrief.id });
   const briefId = row.id;
 

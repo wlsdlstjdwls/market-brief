@@ -1,5 +1,8 @@
 # market-brief 일일 갱신 — 로컬 PC 없이 도는 경로.
 #
+# 정시에 이걸 부르는 건 Vercel Cron이다(vercel.json → /api/cron/dispatch → workflow_dispatch).
+# 아래 schedule 두 줄은 Vercel이 죽은 날을 받는 백업이다.
+#
 # 로컬 작업스케줄러 MarketBrief-Update(= scripts/update_web.bat)와 같은 일을 한다.
 # 둘 다 켜두면 같은 회차를 두 번 적재하므로 한쪽만 쓴다.
 #
@@ -14,24 +17,16 @@ name: daily-update
 
 on:
   schedule:
-    # 원본 루틴이 하루 두 번 쓴다. 회차마다 첫 슬롯 + 재시도 슬롯 둘을 둔다.
+    # 여기 남은 두 줄은 백업이다. 정시 트리거는 Vercel Cron이 맡는다
+    # (vercel.json의 crons → /api/cron/dispatch → 이 워크플로를 workflow_dispatch로 깨움).
     #
-    # GitHub의 스케줄은 보장이 아니라 최선 노력이다. 부하가 걸리면 몇 시간 밀리거나
-    # 아예 안 뜬다. 실제로 2026-09-15 마감판은 5시간 12분 늦게 떴고,
-    # 2026-09-16 프리마켓판은 뜨지 않았다(그래서 그날 화면이 비었다).
-    # 이미 받아 간 회차는 "이미 적재됨 확인" step이 걸러내므로 재시도는 공짜다.
-    #
-    # 프리마켓판(원본 07:4x). 장 전이라 시세는 받지 않는다.
-    # 23:10 UTC 전날 = 08:10 KST → UTC 일~목이 KST 월~금이다.
-    - cron: "10 23 * * 0-4"   # 08:10 KST — 첫 시도
-    - cron: "40 0 * * 1-5"    # 09:40 KST — 재시도 1
-    - cron: "40 2 * * 1-5"    # 11:40 KST — 재시도 2
-    #
-    # 마감 종합판(원본 15:3x, 커밋은 15:53~16:18).
-    # 장 마감 15:30 + 업종 스냅샷 인정 시각 15:40 이후여야 한다. 앞으로 당기지 말 것.
-    - cron: "40 7 * * 1-5"    # 16:40 KST — 첫 시도
-    - cron: "40 9 * * 1-5"    # 18:40 KST — 재시도 1
-    - cron: "40 11 * * 1-5"   # 20:40 KST — 재시도 2
+    # GitHub의 schedule 이벤트는 보장이 아니라 최선 노력이라 몇 시간씩 밀린다.
+    # 실측(2026-09-16~17): 13분 / 42분 / 2시간 10분 / 2시간 32분 / 3시간 07분 지연.
+    # 그래서 첫 슬롯·재시도 1은 Vercel이 부르고, 여기에는 늦은 슬롯만 남겨 둔다
+    # — Vercel 쪽이 통째로 죽은 날의 그물이다. 이미 받아 간 회차는
+    # "이미 적재됨 확인" step이 걸러내므로 중복은 공짜다.
+    - cron: "40 2 * * 1-5"    # 11:40 KST — 프리마켓판 백업
+    - cron: "40 11 * * 1-5"   # 20:40 KST — 마감 종합판 백업
   workflow_dispatch:
     inputs:
       trade_date:
@@ -90,7 +85,7 @@ jobs:
           S="$INPUT_SESSION"
           if [ -z "$S" ] && [ -n "$CRON" ]; then
             case "$CRON" in
-              "10 23 "*|"40 0 "*|"40 2 "*) S=am ;;
+              "40 2 "*) S=am ;;
               *) S=pm ;;
             esac
           fi
@@ -139,7 +134,7 @@ jobs:
           # package.json이 전부 "latest"라 lock과 어긋나면 npm ci가 거부한다.
           npm ci --no-audit --no-fund || npm install --no-audit --no-fund
 
-      # 재시도 슬롯이 하루 세 번 돈다. 첫 슬롯이 이미 받아 갔으면 여기서 끝낸다.
+      # 회차마다 슬롯이 여러 번 돈다(Vercel 2 + 백업 1). 앞 슬롯이 받아 갔으면 여기서 끝낸다.
       # persist가 upsert라 다시 넣어도 결과는 같지만, 도는 김에 원고를 다시 읽을
       # 이유가 없고 로그도 "이미 있음"으로 끝나는 편이 읽기 쉽다.
       # 회차를 지정하지 않은 수동 실행은 항상 false가 나와 그대로 진행한다.
@@ -166,7 +161,9 @@ jobs:
           SESSION: ${{ steps.date.outputs.session }}
         run: |
           # SESSION이 비면 그날 있는 회차를 전부 적재한다(ingest 기본 동작).
-          npx tsx scripts/ingest.ts             --date "${{ steps.date.outputs.trade_date }}"             ${SESSION:+--session "$SESSION"}             --publish
+          # --skip-missing: 그 회차 원고가 아직 없으면 실패가 아니라 스킵이다.
+          # 오전에 am만 나온 날 pm 슬롯이 돌면 늘 이 경우다.
+          npx tsx scripts/ingest.ts             --date "${{ steps.date.outputs.trade_date }}"             ${SESSION:+--session "$SESSION"}             --skip-missing             --publish
 
       - name: 3/3 검증
         if: steps.source.outputs.found == 'true' && steps.done.outputs.exists != 'true'

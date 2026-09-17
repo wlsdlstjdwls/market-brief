@@ -35,6 +35,13 @@ export const dailyBrief = pgTable(
     session: briefSession("session").notNull().default("pm"),
     /** 원본 회차 식별자 (예: run-1535). 추적용이며 원본은 수정하지 않는다. */
     runId: varchar("run_id", { length: 32 }).notNull(),
+    /**
+     * 원고가 적어 둔 작성 기준시각 (`> 작성 시각: 2026-09-17 07:34 KST`).
+     * 화면의 "원고 07:34 작성" 표기가 이 값이다. 적재 시각(publishedAt)과는 다르다 —
+     * 원고가 늦게 올라오면 둘이 몇 시간씩 벌어진다.
+     * 옛 회차에는 이 줄이 없어 null이고, 그때는 runId의 HHMM으로 떨어진다.
+     */
+    writtenAt: timestamp("written_at", { withTimezone: true }),
     headline: text("headline").notNull(),
     /** 한 줄 요약 */
     summary: text("summary").notNull(),

@@ -9,6 +9,10 @@ interface Props {
     tradeDate: string;
     session: Session;
     runId: string;
+    /** 원고가 적어 둔 작성 기준시각. 그 줄이 없는 옛 회차는 null. */
+    writtenAt?: Date | string | null;
+    /** 이 사이트에 올라간 시각(적재 시각). 원고가 늦으면 작성 시각과 몇 시간 벌어진다. */
+    publishedAt?: Date | string | null;
     headline: string;
     macroCommentary: string;
     marketSummary: string;
@@ -41,6 +45,49 @@ function weekday(date: string) {
 function runTime(runId: string) {
   const m = runId.match(/(\d{2})(\d{2})$/);
   return m ? `${m[1]}:${m[2]}` : null;
+}
+
+/*
+ * 시각 표기는 전부 KST로 고정한다. 서버(Vercel)는 UTC로 도는데 포맷터에 시간대를
+ * 주지 않으면 화면의 "07:34"가 배포 환경마다 달라진다.
+ */
+const KST_HM = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+const KST_YMD = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function toDate(v: Date | string | null | undefined): Date | null {
+  if (!v) return null;
+  const d = v instanceof Date ? v : new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** 2026-09-17T07:34+09:00 → "07:34" */
+function hm(v: Date | string | null | undefined) {
+  const d = toDate(v);
+  return d ? KST_HM.format(d) : null;
+}
+
+/**
+ * 게시 시각. 거래일과 다른 날에 올라갔으면 날짜를 같이 찍는다.
+ * 원고가 늦게 나온 날은 다음 날 새벽에 들어가기도 하고, 과거 회차 일괄 적재분은
+ * 거래일과 게시일이 아예 다르다. 시각만 찍으면 그게 언제인지 알 수 없다.
+ */
+function postedLabel(v: Date | string | null | undefined, tradeDate: string) {
+  const d = toDate(v);
+  if (!d) return null;
+  const day = KST_YMD.format(d);
+  const time = KST_HM.format(d);
+  return day === tradeDate ? `${time} 게시` : `${dotted(day).slice(5)} ${time} 게시`;
 }
 
 /**
@@ -300,7 +347,13 @@ export default function BriefView({
   }
 
   const day = weekday(brief.tradeDate);
-  const time = runTime(brief.runId);
+  /*
+   * 작성 시각은 원고가 적어 둔 기준시각이 1순위다(`> 작성 시각: 2026-09-17 07:34 KST`).
+   * 그 줄이 없는 옛 회차만 폴더명(run-1535)의 시각으로 떨어진다. 프리마켓판은
+   * 폴더에 시각이 없어(run-none) 여태 아무 시각도 뜨지 않았다.
+   */
+  const written = hm(brief.writtenAt) ?? runTime(brief.runId);
+  const posted = postedLabel(brief.publishedAt, brief.tradeDate);
 
   return (
     <Shell
@@ -323,9 +376,12 @@ export default function BriefView({
           sessions={sessions}
         />
 
+        {/* 회차 / 원고 작성 시각 / 이 사이트에 올라간 시각. 셋을 따로 찍는다 —
+            원고가 늦게 나온 날은 작성과 게시가 몇 시간씩 벌어진다. */}
         <p className="edition">
-          {SESSION_LABEL[brief.session]}
-          {time ? ` · ${time} 기준` : null}
+          <span>{SESSION_LABEL[brief.session]}</span>
+          {written ? <span>원고 {written} 작성</span> : null}
+          {posted ? <span>{posted}</span> : null}
         </p>
 
         <h1 className="headline">{renderText(brief.headline)}</h1>
