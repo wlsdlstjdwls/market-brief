@@ -5,10 +5,14 @@ import { dailyBrief, briefTopic } from "../db/schema";
 export type Brief = typeof dailyBrief.$inferSelect;
 export type Session = "am" | "pm";
 
-/** 화면에 쓰는 이름. 원본의 작성 기준시각대로 오전은 프리마켓, 오후는 마감 종합이다. */
+/**
+ * 화면에 쓰는 이름. DB의 am/pm과 1:1이다.
+ * 증시 용어(프리마켓, 마감 종합)를 쓰지 않는다 — 이 사이트는 시황이 아니라 뉴스를 싣는다.
+ * 여기만 고치면 탭, 마스트헤드, 페이지 제목이 같이 바뀐다.
+ */
 export const SESSION_LABEL: Record<Session, string> = {
-  pm: "마감 종합",
-  am: "프리마켓",
+  pm: "마감 브리핑",
+  am: "아침 브리핑",
 };
 
 /** 탭은 항상 이 순서다. 기본(먼저 보여줄 것)이 앞. */

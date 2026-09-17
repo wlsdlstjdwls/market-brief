@@ -13,7 +13,8 @@ const sans = Noto_Sans_KR({
 });
 
 export const metadata: Metadata = {
-  title: { default: "시황 브리핑", template: "%s — 시황 브리핑" },
+  // 사이트 이름은 "뉴스 브리핑"이다. 증시 용어(시황)를 쓰지 않는다.
+  title: { default: "데일리 뉴스 브리핑", template: "%s — 뉴스 브리핑" },
   description:
     "그날 시장을 움직인 뉴스와 테마를 정리하는 매일의 브리핑. 개별 종목은 다루지 않습니다.",
 };
@@ -23,7 +24,7 @@ function Header() {
     <header className="topbar">
       <div className="topbar-inner">
         <Link href="/" className="wordmark">
-          시황 브리핑
+          뉴스 브리핑
         </Link>
         <TopNav items={[...NAV]} />
       </div>

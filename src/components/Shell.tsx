@@ -28,7 +28,7 @@ function SiteFooter() {
     <footer className="site-footer">
       {/* 이름과 링크는 한 줄. 130px 거터에 넣으면 링크가 세로로 쌓인다. */}
       <div className="footer-top">
-        <p className="footer-mark">시황 브리핑</p>
+        <p className="footer-mark">뉴스 브리핑</p>
         <nav className="footer-nav">
           {NAV.slice(1).map((n) => (
             <Link key={n.href} href={n.href}>

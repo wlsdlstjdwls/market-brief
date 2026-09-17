@@ -7,15 +7,15 @@ export const revalidate = 300;
 
 type Params = {
   params: Promise<{ date: string }>;
-  /** ?s=am 이면 프리마켓판. 없으면 마감 종합이 기본이다. */
+  /** ?s=am 이면 아침 브리핑. 없으면 마감 브리핑이 기본이다. */
   searchParams: Promise<{ s?: string }>;
 };
 
 export async function generateMetadata({ params, searchParams }: Params): Promise<Metadata> {
   const { date } = await params;
   const { s } = await searchParams;
-  const label = isSession(s) ? ` ${SESSION_LABEL[s]}` : "";
-  return { title: `${date}${label} 브리핑` };
+  // 라벨 자체가 "… 브리핑"이라 뒤에 또 붙이면 겹친다.
+  return { title: isSession(s) ? `${date} ${SESSION_LABEL[s]}` : `${date} 브리핑` };
 }
 
 export default async function BriefPage({ params, searchParams }: Params) {
