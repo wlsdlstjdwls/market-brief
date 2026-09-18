@@ -450,7 +450,8 @@ vercel deploy --prod
 ## 현재 상태 (2026-09-18 기준)
 
 - 배포됨: https://market-brief-xi.vercel.app (공개, 배포 보호 해제).
-  **프로덕션 = 커밋 `2f16d1e`.** 09-18 변경분이 전부 올라가 있다
+  **프로덕션 = 커밋 `2f16d1e`.** 09-18 변경분이 전부 올라가 있다.
+  이후 커밋은 이 문서뿐이라 배포가 밀려 있지 않다 — 코드를 고쳤을 때만 배포한다
 - 저장소: https://github.com/wlsdlstjdwls/market-brief (private). 로컬과 원격 main이 같다
 - Vercel 요금제는 **Pro**다. Cron이 분 단위로 도는 근거이고, Hobby 한도로 판단하면 결론이 틀린다
 - Neon: Vercel Marketplace 연동, 무료 플랜, sin1 리전. `DATABASE_URL` 자동 주입
