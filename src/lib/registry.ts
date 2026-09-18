@@ -74,3 +74,21 @@ export function matchSector(label: string): SectorDef | null {
   const l = norm(label);
   return SECTORS.find((d) => d.match.some((m) => l.includes(m))) ?? null;
 }
+
+/** 지수·매크로·업종 표준 명칭 전부. 사전 충돌을 걸러낼 때 쓴다. */
+export const REGISTRY_NAMES: string[] = [
+  ...INDICES.map((d) => d.name),
+  ...MACROS.map((d) => d.name),
+  ...SECTORS.map((d) => d.name),
+];
+
+/**
+ * 사전에 걸린 표기가 사실은 레지스트리 표준 명칭의 일부인지 본다.
+ * "러셀 2000"의 `러셀`처럼 우리가 직접 정한 값이라 종목 위반이 아니다.
+ *
+ * `verify.ts`와 `notify-telegram.ts`가 같은 기준으로 봐야 해서 여기 둔다.
+ * 둘이 갈리면 검증은 통과한 문장이 발송에서 막히거나 그 반대가 된다.
+ */
+export function isRegistryName(match: string, context: string): boolean {
+  return REGISTRY_NAMES.some((n) => n.includes(match) && context.includes(n));
+}

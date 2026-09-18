@@ -743,6 +743,33 @@ a:hover {
 
 /* ---------- 푸터 ---------- */
 
+/* 텔레그램 안내. 푸터 바로 위 한 줄.
+   박스를 치지 않는다 — 카드·둥근 모서리·배경 채움 없음이 이 사이트의 규칙이다. */
+.tg-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 20px;
+  margin-top: clamp(32px, 5vw, 56px);
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.tg-cta-text {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.tg-cta-link {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--accent);
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 1px;
+}
+
 .site-footer {
   padding: 26px 0 0;
   border-top: 1px solid var(--rule-strong);

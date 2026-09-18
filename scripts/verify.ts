@@ -8,18 +8,9 @@
  */
 import { readFileSync } from "node:fs";
 import { scan } from "../src/lib/guard";
-import { INDICES, MACROS, SECTORS } from "../src/lib/registry";
-
-/** 레지스트리 표준 명칭은 우리가 정한 값이라 사전 충돌이 나도 위반이 아니다. */
-const REGISTRY_NAMES = [
-  ...INDICES.map((d) => d.name),
-  ...MACROS.map((d) => d.name),
-  ...SECTORS.map((d) => d.name),
-];
-
-function isRegistryName(match: string, context: string): boolean {
-  return REGISTRY_NAMES.some((n) => n.includes(match) && context.includes(n));
-}
+/** 레지스트리 표준 명칭은 우리가 정한 값이라 사전 충돌이 나도 위반이 아니다.
+ *  발송(notify-telegram.ts)도 같은 기준을 써야 해서 registry.ts로 옮겼다. */
+import { REGISTRY_NAMES, isRegistryName } from "../src/lib/registry";
 
 function visibleText(html: string): string {
   return html

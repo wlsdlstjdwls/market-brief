@@ -180,6 +180,21 @@ jobs:
             echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # 채널에 발행 알림을 보낸다. 헤드라인과 링크까지고 본문은 안 싣는다
+      # (scripts/notify-telegram.ts 머리말 참고).
+      #
+      # "이미 적재됨"으로 건너뛴 슬롯에서도 돈다. 앞 슬롯이 적재는 했는데 발송에서
+      # 실패했을 수 있어서다. 중복은 daily_brief.notified_at이 막고, 오래된 회차는
+      # 48시간 제한이 막는다. secret이 없으면 스크립트가 조용히 끝낸다.
+      - name: 4/4 텔레그램 발송
+        if: steps.source.outputs.found == 'true'
+        env:
+          SESSION: ${{ steps.date.outputs.session }}
+          TG_CHANNEL_BOT_TOKEN: ${{ secrets.TG_CHANNEL_BOT_TOKEN }}
+          TG_CHANNEL_ID: ${{ secrets.TG_CHANNEL_ID }}
+        run: |
+          npx tsx scripts/notify-telegram.ts             --date "${{ steps.date.outputs.trade_date }}"             ${SESSION:+--session "$SESSION"}
+
       - name: 수집 결과 보관 (실패 원인 추적용)
         if: always() && steps.source.outputs.found == 'true'
         uses: actions/upload-artifact@v4

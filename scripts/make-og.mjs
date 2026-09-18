@@ -23,7 +23,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
 
   <text x="90" y="200" font-family="${FONT}" font-size="34" font-weight="600" fill="#2563eb" letter-spacing="6">DAILY</text>
 
-  <text x="90" y="330" font-family="${FONT}" font-size="104" font-weight="700" fill="#14161a">뉴스 브리핑</text>
+  <text x="90" y="330" font-family="${FONT}" font-size="104" font-weight="700" fill="#14161a">더 브리핑</text>
 
   <rect x="90" y="382" width="120" height="3" fill="#14161a"/>
 

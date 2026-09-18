@@ -27,6 +27,7 @@
 | `src/lib/sources.ts` | 원고가 인용한 기사 링크 추출. 매체명만 남기고 URL도 검사 |
 | `src/lib/headline.ts` | 헤드라인에서 지수 시세 접두부 제거 |
 | `src/lib/registry.ts` | 지수·매크로·업종 표준 명칭 화이트리스트 |
+| `src/lib/notify.ts` | 텔레그램 알림 문구 조립 + 발송 직전 최종 검사 |
 | `src/lib/render.ts` | 렌더 직전 최종 방어 + 마크다운 변환 |
 | `src/lib/persist.ts` | Neon 적재. 적재 직전 재검사 + 감사 로그 |
 | `src/db/schema.ts` | Drizzle 스키마 8테이블 |
@@ -34,6 +35,8 @@
 | `scripts/add-session.ts` | `daily_brief.session` 추가 + 유니크 키 교체 (1회성, 2026-09-15 적용 완료) |
 | `scripts/add-written-at.ts` | `daily_brief.written_at` 추가 (1회성, 2026-09-17 적용 완료, 아무것도 지우지 않음) |
 | `scripts/add-sources.ts` | `daily_brief.sources`, `brief_topic.sources` 추가 (1회성, 2026-09-18 적용 완료) |
+| `scripts/notify-telegram.ts` | 발행 알림을 채널로 보낸다. 중복·과거 회차를 막는다 |
+| `scripts/add-notified-at.ts` | `daily_brief.notified_at` 추가 (1회성, 2026-09-18 적용 완료, 기존 78회차를 발송 대상에서 제외) |
 | `scripts/fetch_market.py` | 실제 시세 수집 → `data/market/{날짜}.json` |
 | `scripts/ingest.ts` | 적재 CLI |
 | `scripts/verify.ts` | 발행 결과 검증 (DB / 저장한 HTML) |
@@ -222,6 +225,40 @@ KRX(data.krx.co.kr)가 이 PC의 IP를 차단한다. 응답이 JSON이 아니라
 
 `markdown.ts`의 `NOISE_LINE`(구분선)과 `EMPTY_PARA`(굵은 글씨만 있는 문단)가 막는다.
 
+### 텔레그램 채널 알림 (2026-09-18 추가)
+
+구독 신청 폼 대신 **공개 채널**이다. `t.me/thebriefing_kr`, 봇은 `@thebriefing_kr_bot`.
+
+**이메일을 안 받는 게 요점이다.** 메일 주소를 받으면 개인정보 처리방침이 다시 필수가 되고
+(개인정보 보호법 제30조) 발송에는 더블 옵트인·수신거부가 붙는다(정보통신망법 제50조).
+공개 채널은 독자가 알아서 들어오고 나가므로 이쪽이 쥐는 개인정보가 0이다 —
+지금의 "수집하지 않음" 상태가 그대로 유지된다. 구독 폼을 지운 판단(위 "이메일 구독 삭제")과 같은 선이다.
+
+- **본문을 싣지 않는다.** 헤드라인 + 잘라낸 요약 + 링크까지다. 종목 차단의 마지막 방어선이
+  렌더 단계(`renderMarkdown`)인데 텔레그램은 그 경로를 타지 않는다. RSS와 같은 이유이고,
+  같은 이유로 `notify.ts`의 `violations()`가 보내기 직전에 `scan`을 한 번 더 돌린다.
+  덤으로 독자가 사이트로 들어와야 하므로 광고 노출도 지킨다.
+- **URL은 검사하지 않는다.** KRX에 `TP`라는 종목이 있어서 **`https`의 `tp`가** 걸린다.
+  실제로 첫 dry-run이 이걸로 막혔다. `sources.ts`가 링크를 한글 구간만 보는 것과 같은 함정이라
+  `compose()`가 검사용 `prose`(헤드라인+요약)를 따로 돌려준다. 회귀 테스트가 붙어 있다.
+- **한 회차는 한 번만 나간다.** `daily_brief.notified_at`이 근거다. 회차마다 슬롯이 여섯 번
+  돌고 손으로 재적재하는 일도 있는데, 채널에 나간 글은 지워도 이미 읽힌다.
+- **오래된 회차는 안 나간다.** `published_at`이 48시간을 넘겼으면 건너뛴다. 과거 회차를
+  재적재하다 몇 달 치가 한꺼번에 나가는 사고를 막는 두 번째 그물이다.
+  `scripts/add-notified-at.ts`가 기존 78회차를 전부 발송 완료로 찍어 첫 번째 그물을 쳐 뒀다.
+- **`parse_mode`를 쓰지 않는다.** 헤드라인에 `*`나 `_`가 섞이면 이스케이프 사고로 발송이
+  통째로 깨진다. 서식보다 안 깨지는 쪽이 싸다. 링크 미리보기는 켜 둔다(og:image가 그대로 뜬다).
+- 워크플로의 `4/4 텔레그램 발송` step은 **"이미 적재됨"으로 건너뛴 슬롯에서도 돈다.**
+  앞 슬롯이 적재는 했는데 발송에서 실패했을 수 있어서다. 중복은 `notified_at`이 막는다.
+- 화면에서는 푸터 위 한 줄(`Shell.tsx`의 `TelegramCta`)과 푸터 링크 두 자리다. 신청 폼은 없다.
+
+필요한 repository secret — `TG_CHANNEL_BOT_TOKEN`, `TG_CHANNEL_ID`(`@thebriefing_kr`).
+**실패 알림용 `TELEGRAM_BOT_TOKEN`·`TELEGRAM_CHAT_ID`와 다른 값이다.** 그쪽은 운영자 개인 챗이다.
+secret이 없으면 스크립트가 조용히 끝낸다(exit 0).
+
+**상위 저장소의 텔레그램 파이프라인은 절대 쓰지 않는다.** 그쪽(`send_news_telegram.py`)은
+종목을 그대로 내보낸다. 이 채널은 별개의 봇이고 별개의 채널이다.
+
 ## 론칭 준비 (2026-09-18)
 
 공유·색인·계측이 통째로 비어 있었다. 여덟 가지를 채웠다.
@@ -301,6 +338,7 @@ npm run typecheck
 npm run guard -- <파일|폴더>  # 원본에 어떤 종목 표기가 있는지
 npm run ingest -- --dry-run  # DB 없이 적재 결과 미리보기
 npm run verify               # DB의 published 브리핑 검사
+npm run notify -- --dry-run  # 텔레그램에 나갈 문구 미리보기 (발송 안 함)
 
 npm run ingest -- --date 2026-09-08 --session am --dry-run   # 오전판만 미리보기
 npm run ingest -- --session pm --skip-missing --publish       # 그 회차가 아직 없으면 실패 대신 스킵
@@ -490,7 +528,7 @@ vercel deploy --prod
 
 ## 현재 상태 (2026-09-18 기준)
 
-- 배포됨: https://market-brief-xi.vercel.app (공개, 배포 보호 해제).
+- 배포됨: **https://thebriefing.kr** (가비아 등록, Vercel 연결, `www`는 301). 옛 주소 `market-brief-xi.vercel.app`도 계속 열린다.
   **프로덕션 = 커밋 `2f16d1e`.** 09-18 변경분이 전부 올라가 있다.
   이후 커밋은 이 문서뿐이라 배포가 밀려 있지 않다 — 코드를 고쳤을 때만 배포한다
 - 저장소: https://github.com/wlsdlstjdwls/market-brief (private). 로컬과 원격 main이 같다
@@ -505,6 +543,12 @@ vercel deploy --prod
   아침은 08:10부터 09:00까지, 마감은 16:40부터 17:40까지 각 10분 간격이고 마지막 슬롯이 하나씩 더 붙는다(09:00 / 18:40).
   GitHub `schedule`은 백업 두 줄(11:40·20:40)만 남아 있다
 - 로컬 작업 스케줄러 `MarketBrief-Update`는 **비활성화됨** (중복 실행 방지, 되돌리기는 `/ENABLE`)
+- **도메인 `thebriefing.kr` 적용 완료** (2026-09-18). 브랜드명도 `뉴스 브리핑` →
+  **`더 브리핑`** 으로 같이 바꿨다 (`site.ts`의 `SITE_NAME`·`SITE_TITLE`, `layout.tsx`
+  워드마크, `Shell.tsx` 푸터 마크, `scripts/make-og.mjs` 후 og 카드 재생성).
+  **`NEXT_PUBLIC_SITE_URL`은 Production 환경변수로 넣었다** — `site.ts`의 기본값도 같이
+  바꿨지만 환경변수가 먼저 읽힌다. **빌드 시점 값이라 배포하지 않으면 안 바뀐다**
+- 텔레그램 채널 `t.me/thebriefing_kr` 라이브, secret 등록 완료
 - 공유 카드, 파비콘, robots, sitemap, RSS, 404, Analytics 전부 라이브 (위 "론칭 준비" 절)
 - 브랜드 마크 한 벌(헤더 로고, favicon.ico, apple-icon, manifest, theme-color) **작업 완료,
   아직 배포 안 함** — `vercel deploy --prod` 필요 (위 "브랜드 마크와 앱 아이콘" 절)
@@ -519,7 +563,7 @@ vercel deploy --prod
 
 ```bash
 vercel env pull --environment=production .env.production   # 값 확인용, 커밋 금지
-curl -H "Authorization: Bearer $CRON_SECRET"   "https://market-brief-xi.vercel.app/api/cron/dispatch?s=pm"
+curl -H "Authorization: Bearer $CRON_SECRET"   "https://thebriefing.kr/api/cron/dispatch?s=pm"
 ```
 
 돌아오는 모양은 셋뿐이다.

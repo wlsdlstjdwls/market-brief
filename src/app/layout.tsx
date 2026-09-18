@@ -21,7 +21,7 @@ export const metadata: Metadata = {
    * 없으면 카카오톡·슬랙이 상대 경로를 못 읽어 미리보기가 통째로 비어 보인다.
    */
   metadataBase: new URL(SITE_URL),
-  // 사이트 이름은 "뉴스 브리핑"이다. 증시 용어(시황)를 쓰지 않는다.
+  // 사이트 이름은 "더 브리핑"이다. 증시 용어(시황)를 쓰지 않는다.
   title: { default: SITE_TITLE, template: `%s — ${SITE_NAME}` },
   description: SITE_DESCRIPTION,
   applicationName: SITE_NAME,
@@ -77,7 +77,7 @@ function Header() {
       <div className="topbar-inner">
         <Link href="/" className="wordmark">
           <Mark />
-          뉴스 브리핑
+          더 브리핑
         </Link>
         <TopNav items={[...NAV]} />
       </div>

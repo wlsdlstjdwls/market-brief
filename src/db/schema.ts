@@ -55,6 +55,15 @@ export const dailyBrief = pgTable(
     /** 유료 전환 대비 자리. MVP에서는 전부 'free'. */
     tier: varchar("tier", { length: 16 }).notNull().default("free"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
+    /**
+     * 텔레그램 채널에 알림을 보낸 시각. **중복 발송을 막는 유일한 근거다.**
+     *
+     * 회차마다 슬롯이 여섯 번 돌고 손으로 재적재하는 일도 있는데, 채널에 나간 글은
+     * 되돌릴 수 없다. 값이 차 있으면 다시 보내지 않는다(`--force`로만 넘긴다).
+     * 컬럼을 더할 때 이미 있던 회차는 전부 지금 시각으로 찍어 과거 글이 한꺼번에
+     * 나가는 사고를 막았다 (`scripts/add-notified-at.ts`).
+     */
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

@@ -17,13 +17,22 @@ export const SITE_URL = (() => {
     (process.env.VERCEL_PROJECT_PRODUCTION_URL
       ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
       : null);
-  return (fromEnv ?? "https://market-brief-xi.vercel.app").replace(/\/+$/, "");
+  return (fromEnv ?? "https://thebriefing.kr").replace(/\/+$/, "");
 })();
 
-export const SITE_NAME = "뉴스 브리핑";
-export const SITE_TITLE = "데일리 뉴스 브리핑";
+export const SITE_NAME = "더 브리핑";
+export const SITE_TITLE = "더 브리핑 — 매일 두 번, 오늘의 뉴스";
 export const SITE_DESCRIPTION =
   "그날 시장을 움직인 뉴스와 테마를 정리하는 매일의 브리핑. 개별 종목은 다루지 않습니다.";
+
+/**
+ * 텔레그램 채널. 발행 알림이 여기로 나가고, 화면의 "텔레그램으로 받기"가 여기로 보낸다.
+ *
+ * **신청 폼이 아니라 링크다.** 이메일을 받으면 개인정보 처리방침이 다시 필수가 되고
+ * (개인정보 보호법 제30조) 발송에도 더블 옵트인·수신거부가 붙는다(정보통신망법 제50조).
+ * 공개 채널은 독자가 알아서 들어오고 나가므로 이쪽이 쥐는 개인정보가 0이다.
+ */
+export const TELEGRAM_URL = "https://t.me/thebriefing_kr";
 
 /**
  * 문의 주소. **설정하지 않으면 화면에 아무것도 그리지 않는다.**
