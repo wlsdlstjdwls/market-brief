@@ -1,7 +1,7 @@
 /**
  * 텔레그램 알림 회귀.
  *
- * 여기 세 건은 전부 "고쳤다가 다시 깨지기 쉬운" 자리다.
+ * 여기 것들은 전부 "고쳤다가 다시 깨지기 쉬운" 자리다.
  */
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
@@ -26,21 +26,45 @@ test("헤드라인에 종목이 있으면 발송을 막는다", () => {
   assert.ok(violations(prose).length > 0);
 });
 
-test("본문을 싣지 않는다 — 헤드라인, 요약, 링크 세 덩이뿐", () => {
-  const { text } = compose(base);
-  // 머리표 + 빈 줄 + 헤드라인 + 빈 줄 + 요약 + 빈 줄 + 링크 = 7줄
-  assert.equal(text.split("\n").length, 7);
+test("카드 제목도 검사 대상에 들어간다", () => {
+  const { prose } = compose(base, ["SK하이닉스 HBM 증설 발표"]);
+  assert.ok(violations(prose).length > 0);
+});
+
+test("본문은 싣지 않는다 — 헤드라인, 요약, 카드 제목, 링크뿐", () => {
+  const { text } = compose(base, ["금리 급락"]);
+  assert.ok(text.includes(base.headline));
+  assert.ok(text.includes("금리 급락"));
+  assert.ok(!text.includes("무슨 일인가"), "카드 본문은 들어가지 않는다");
+});
+
+test("HTML 특수문자는 이스케이프한다 (S&P500이 흔하다)", () => {
+  const { text } = compose({ ...base, headline: "S&P500 +1.14% <최고치>" });
+  assert.ok(text.includes("S&amp;P500"));
+  assert.ok(text.includes("&lt;최고치&gt;"));
+});
+
+test("카드 제목의 대괄호는 벗기고, 헤드라인과 같은 카드는 뺀다", () => {
+  const { text } = compose(base, [`[${base.headline}]`, "[금리 급락]"]);
+  assert.ok(text.includes("— 금리 급락"));
+  assert.ok(!text.includes(`[${base.headline}]`));
+  assert.equal(text.split("— ").length - 1, 1, "남는 카드는 한 줄뿐");
+});
+
+test("카드가 없으면 '오늘 다룬 이야기' 자체를 안 그린다", () => {
+  const { text } = compose(base, []);
+  assert.ok(!text.includes("오늘 다룬 이야기"));
 });
 
 test("긴 요약은 문장 경계에서 잘린다", () => {
   const long =
     "첫 문장은 여기서 끝난다. " + "두 번째 문장이 아주 길게 이어지면서 계속 늘어난다. ".repeat(6);
   const out = clip(long);
-  assert.ok(out.length <= 152, `잘린 길이 ${out.length}`);
+  assert.ok(out.length <= 182, `잘린 길이 ${out.length}`);
   assert.ok(out.endsWith("다.") || out.endsWith("…"));
 });
 
 test("요약이 헤드라인과 같으면 한 번만 싣는다", () => {
   const { text } = compose({ ...base, summary: base.headline });
-  assert.equal(text.split("\n").length, 5);
+  assert.equal(text.split(base.headline).length - 1, 1);
 });

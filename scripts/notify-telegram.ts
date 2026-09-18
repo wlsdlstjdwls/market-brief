@@ -22,7 +22,7 @@
  */
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../src/db";
-import { dailyBrief } from "../src/db/schema";
+import { briefTopic, dailyBrief } from "../src/db/schema";
 import { compose, violations } from "../src/lib/notify";
 
 /** 이보다 오래 전에 발행된 회차는 보내지 않는다. 재적재 사고 방지용. */
@@ -56,8 +56,14 @@ async function send(text: string): Promise<void> {
   const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    // 링크 미리보기는 켜 둔다. og:image 카드가 채널에서 그대로 뜬다.
-    body: JSON.stringify({ chat_id: CHAT, text, disable_web_page_preview: false }),
+    body: JSON.stringify({
+      chat_id: CHAT,
+      text,
+      // HTML 모드. 이스케이프할 글자가 &, <, > 셋뿐이라 사고가 나지 않는다 (notify.ts의 esc).
+      parse_mode: "HTML",
+      // 링크 미리보기는 켜 둔다. og:image 카드가 채널에서 그대로 뜬다.
+      disable_web_page_preview: false,
+    }),
   });
   const body = (await res.json()) as { ok?: boolean; description?: string };
   if (!res.ok || !body.ok) {
@@ -104,7 +110,15 @@ async function main() {
       continue;
     }
 
-    const { text, prose } = compose(b);
+    // 그날 다룬 카드 제목 몇 줄. 적재 때 이미 걸러진 값이지만 prose에 실려 한 번 더 검사된다.
+    const topics = await db
+      .select({ title: briefTopic.title })
+      .from(briefTopic)
+      .where(eq(briefTopic.briefId, b.id))
+      .orderBy(briefTopic.kind, briefTopic.rank)
+      .limit(3);
+
+    const { text, prose } = compose(b, topics.map((t) => t.title));
     const bad = violations(prose);
     if (bad.length) {
       console.error(`✗ ${label} 발송 중단 — 종목 표기 ${bad.length}건`);
