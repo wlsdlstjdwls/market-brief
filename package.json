@@ -15,7 +15,9 @@
     "typecheck": "tsc --noEmit",
     "fetch:market": "python scripts/fetch_market.py",
     "verify": "tsx scripts/verify.ts",
-    "notify": "tsx scripts/notify-telegram.ts"
+    "notify": "tsx scripts/notify-telegram.ts",
+    "admin:password": "node scripts/admin-password.mjs",
+    "db:page-view": "tsx --env-file=.env.local scripts/add-page-view.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "latest",

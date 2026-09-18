@@ -7,7 +7,7 @@
  */
 
 import {
-  pgTable, serial, integer, text, varchar, boolean, date, timestamp,
+  pgTable, serial, bigserial, integer, text, varchar, boolean, date, timestamp, uuid,
   numeric, jsonb, uniqueIndex, index, pgEnum,
 } from "drizzle-orm/pg-core";
 
@@ -187,4 +187,37 @@ export const publishAudit = pgTable(
     checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("publish_audit_date_idx").on(t.tradeDate)]
+);
+
+/**
+ * 방문 기록. **웹이 DB에 쓰는 유일한 표다** (`/api/track`).
+ *
+ * 브리핑 적재는 전부 로컬/Actions에서 도는 `ingest.ts`가 한다. 방문만은 브라우저에서만
+ * 생기는 사실이라 파이프라인이 알 길이 없어 여기 한 자리를 열었다.
+ *
+ * **적는 것은 넷뿐이다** — 브라우저가 만든 무작위 UUID, 경로, 유입 도메인, 시각.
+ * IP도 User-Agent도 쿼리스트링도 안 적는다(User-Agent는 봇을 거르는 데만 쓰고 버린다).
+ * 종목을 담을 칸이 없는 건 다른 표와 같다.
+ */
+export const pageView = pgTable(
+  "page_view",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    /** 브라우저가 localStorage에 쥐는 난수 UUID. 서버가 심지 않는다 */
+    visitorId: uuid("visitor_id").notNull(),
+    /** 쿼리스트링을 뗀 경로만. `/admin`으로 시작하면 아예 안 받는다 */
+    path: varchar("path", { length: 200 }).notNull(),
+    /** 유입 **도메인**만. 경로·쿼리가 붙은 referrer는 그 자체로 개인정보가 될 수 있다 */
+    referrerHost: varchar("referrer_host", { length: 100 }),
+    /**
+     * 페이지를 새로 연 첫 조회인가. 유입 집계는 이 줄만 센다 —
+     * 안에서 옮겨 다닐 때는 referrer가 안 바뀌어 같은 출처가 부풀려진다.
+     */
+    entry: boolean("entry").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("page_view_created_idx").on(t.createdAt),
+    index("page_view_visitor_idx").on(t.visitorId, t.createdAt),
+  ]
 );

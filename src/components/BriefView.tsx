@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { renderMarkdown, renderText } from "../lib/render";
-import { SESSION_LABEL, SESSION_ORDER, type Session } from "../lib/queries";
+import { SESSION_LABEL, type Session } from "../lib/queries";
 import SectionRail from "./SectionRail";
+import SessionTabs from "./SessionTabs";
 import Shell from "./Shell";
 
 interface Props {
@@ -23,6 +24,11 @@ interface Props {
   sessions?: Session[];
   /** 탭 링크의 뿌리. 홈이면 "/", 날짜 페이지면 "/brief/{날짜}". */
   basePath?: string;
+  /**
+   * 섹션 id 앞에 붙이는 말. 날짜 페이지가 두 회차를 한 문서에 같이 구우므로
+   * 접두어가 없으면 `#news`가 양쪽에 생겨 목차 앵커가 숨은 쪽으로 튄다.
+   */
+  idPrefix?: string;
   topics?: Array<{
     kind: string;
     rank: number;
@@ -76,38 +82,6 @@ function postedLabel(v: Date | string | null | undefined, tradeDate: string) {
   const day = KST_YMD.format(d);
   const time = KST_HM.format(d);
   return day === tradeDate ? `${time} 게시` : `${dotted(day).slice(5)} ${time} 게시`;
-}
-
-/**
- * 회차 탭. 원본 루틴이 하루 두 번 쓰기 때문에 한 날짜에 글이 둘이다.
- * 링크만 쓰므로 클라이언트 자바스크립트가 필요 없다.
- */
-function SessionTabs({
-  basePath,
-  current,
-  sessions,
-}: {
-  basePath: string;
-  current: Session;
-  sessions: Session[];
-}) {
-  const shown = SESSION_ORDER.filter((s) => sessions.includes(s));
-  if (shown.length < 2) return null;
-  return (
-    <nav className="tabs" aria-label="회차">
-      {shown.map((s) => (
-        <Link
-          key={s}
-          href={s === "pm" ? basePath : `${basePath}?s=${s}`}
-          className={s === current ? "tab tab--on" : "tab"}
-          aria-current={s === current ? "page" : undefined}
-          scroll={false}
-        >
-          {SESSION_LABEL[s]}
-        </Link>
-      ))}
-    </nav>
-  );
 }
 
 /** 2026-09-15 → 2026.09.15 (마스트헤드에서 가장 큰 요소) */
@@ -295,6 +269,7 @@ export default function BriefView({
   brief,
   sessions = [],
   basePath = `/brief/${brief.tradeDate}`,
+  idPrefix = "",
   topics = [],
   recent = [],
 }: Props) {
@@ -411,7 +386,7 @@ export default function BriefView({
     <Shell
       rail={
         <SectionRail
-          items={blocks.map((b) => ({ id: b.id, label: b.label }))}
+          items={blocks.map((b) => ({ id: `${idPrefix}${b.id}`, label: b.label }))}
           meta={dotted(brief.tradeDate)}
         />
       }
@@ -422,11 +397,8 @@ export default function BriefView({
           {day ? <span className="masthead-meta">{day}요일</span> : null}
         </div>
 
-        <SessionTabs
-          basePath={basePath}
-          current={brief.session}
-          sessions={sessions}
-        />
+        {/* 켜진 탭은 `<html data-session>`을 보고 CSS가 고른다. SessionTabs 주석 참고 */}
+        <SessionTabs basePath={basePath} sessions={sessions} />
 
         {/* 회차와 게시 시각만 찍는다. 원고 작성 시각은 사용자 지시로 뺐다(2026-09-17).
             값은 daily_brief.written_at에 계속 쌓이므로 되살리려면 여기만 되돌리면 된다. */}
@@ -441,7 +413,7 @@ export default function BriefView({
       {blocks.map((b, i) => (
         <Section
           key={b.id}
-          id={b.id}
+          id={`${idPrefix}${b.id}`}
           ord={i + 1}
           label={b.label}
           note={b.note}

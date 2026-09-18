@@ -61,6 +61,8 @@ function SiteFooter() {
             텔레그램
           </a>
           <a href="/rss.xml">RSS</a>
+          {/* 방문 집계를 켜면서 다시 필수가 됐다(개인정보 보호법 제30조). 첫 화면에서 한 번에 닿아야 한다 */}
+          <Link href="/privacy">개인정보 처리방침</Link>
           {/* 주소를 설정하지 않으면 아무것도 그리지 않는다 (site.ts 주석 참고). */}
           {CONTACT_EMAIL ? <a href={`mailto:${CONTACT_EMAIL}`}>문의</a> : null}
         </nav>

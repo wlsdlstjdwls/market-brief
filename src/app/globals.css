@@ -292,10 +292,33 @@ a:hover {
   text-decoration: none;
 }
 
-.tab--on {
+/*
+ * 켜진 탭과 보이는 회차는 `<html data-session>` 한 값이 정한다.
+ * 그 값은 날짜 페이지의 인라인 스크립트가 **그리기 전에** 넣는다 —
+ * 서버가 searchParams를 읽으면 ISR 캐시가 통째로 죽기 때문이다
+ * (2026-09-18 실측: 홈 캐시 HIT 50ms vs 날짜 페이지 매번 MISS 800ms).
+ *
+ * 기본값은 마감 브리핑이다. 스크립트가 못 돌아도(자바스크립트 끔) 마감판이 보인다.
+ */
+html[data-session="am"] .tab[data-s="am"],
+html:not([data-session="am"]) .tab[data-s="pm"] {
   color: var(--fg);
   font-weight: 600;
   border-bottom-color: var(--rule-strong);
+}
+
+/*
+ * 두 회차를 한 문서에 굽고 한쪽만 보인다.
+ * `display: contents`라 감싸는 div가 레이아웃에 끼어들지 않는다 — `.shell`이
+ * 그대로 main의 자식처럼 앉는다.
+ */
+.ses {
+  display: contents;
+}
+
+html[data-session="am"] .ses--pm,
+html:not([data-session="am"]) .ses--am {
+  display: none;
 }
 
 /* 지금 보고 있는 회차와 기준시각. 탭이 없는 날에도 뜬다. */
@@ -848,4 +871,593 @@ a:hover {
 .footer-note--faint {
   margin: 10px 0 0;
   color: var(--fainter);
+}
+
+/* ---------- 관리자 콘솔 ---------- */
+/*
+ * 독자 화면과 같은 기준을 쓴다 — 카드, 박스, 둥근 모서리, 배경 채움 없음.
+ * 다른 점은 밀도뿐이다. 운영자가 숫자를 훑는 자리라 글자를 한 급 줄이고 행간을 좁혔다.
+ * 본문폭도 720px이 아니라 표가 들어갈 만큼 넓게 쓴다.
+ */
+
+.adm {
+  margin: 0 auto;
+  max-width: 1120px;
+  padding: 0 clamp(16px, 3vw, 32px) 72px;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.adm-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 4px;
+  padding: 14px 0 0;
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.adm-nav a {
+  padding: 8px 13px 9px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.adm-nav a:hover {
+  color: var(--fg);
+}
+
+.adm-nav a.on {
+  color: var(--fg);
+  font-weight: 600;
+  border-bottom-color: var(--rule-strong);
+}
+
+/* 탭 옆 배지. 걸린 게 있을 때만 붙으므로 늘 눈에 띄어야 한다 */
+.adm-nav a em {
+  margin-left: 5px;
+  padding: 1px 5px;
+  background: var(--up);
+  color: #fff;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.adm-nav form {
+  margin-left: auto;
+}
+
+.adm-nav button {
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.adm-nav button:hover {
+  color: var(--fg);
+  border-color: var(--fg);
+}
+
+.adm-page {
+  padding-top: clamp(24px, 4vw, 40px);
+}
+
+.adm-head h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.adm-sub {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.adm-sub strong {
+  color: var(--up);
+}
+
+.adm-sec {
+  margin-top: clamp(28px, 4vw, 44px);
+}
+
+.adm-sec > h2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0 0 12px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--rule-strong);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.adm-sec > h2 small,
+.adm-sec > h2 a {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--faint);
+}
+
+.adm-sec > h2 a {
+  margin-left: auto;
+}
+
+.adm-sec > h2 a:hover {
+  color: var(--accent);
+}
+
+/* 타일. 셀마다 아래 헤어라인을 줘서 개수가 열 배수와 안 맞아도 빈칸이 안 생긴다 */
+.adm-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  border-top: 1px solid var(--line);
+}
+
+.adm-stat {
+  padding: 11px 14px 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.adm-stat > span {
+  display: block;
+  font-size: 11.5px;
+  color: var(--faint);
+  letter-spacing: 0.02em;
+}
+
+.adm-stat > b {
+  display: block;
+  margin-top: 2px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.adm-stat > small {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.adm-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+
+.adm-note--foot {
+  margin-top: clamp(32px, 5vw, 52px);
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  color: var(--faint);
+}
+
+.adm-note code,
+.adm-sub code {
+  margin: 0 3px;
+  padding: 1px 4px;
+  background: rgba(20, 22, 26, 0.05);
+  font-size: 11.5px;
+}
+
+/* 기간과 쪽 칩 */
+.adm-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 16px 0 0;
+}
+
+.adm-chips a {
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.adm-chips a:hover {
+  color: var(--fg);
+  border-color: var(--fg);
+}
+
+.adm-chips a.on {
+  border-color: var(--rule-strong);
+  color: var(--fg);
+  font-weight: 600;
+}
+
+/* 표. 좁은 화면에서는 가로로 민다 — 칸을 접으면 어느 회차가 빈지 못 읽는다 */
+.adm-table {
+  margin-top: 4px;
+  overflow-x: auto;
+}
+
+.adm-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.adm-table th,
+.adm-table td {
+  padding: 8px 10px 8px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.adm-table th {
+  border-bottom-color: var(--rule-strong);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--faint);
+  letter-spacing: 0.02em;
+}
+
+.adm-table .num {
+  text-align: right;
+  padding-right: 14px;
+}
+
+.adm-table tr.bad td,
+.adm-table td.bad {
+  color: var(--up);
+}
+
+.adm-table a:hover {
+  color: var(--accent);
+}
+
+/* 헤드라인처럼 길어도 되는 칸 */
+.adm-cell-wide {
+  white-space: normal;
+  min-width: 260px;
+  max-width: 520px;
+}
+
+.adm-flag {
+  margin-left: 6px;
+  color: var(--up);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.adm-path {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.adm-viol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 6px;
+}
+
+.adm-viol em {
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  font-size: 11.5px;
+  font-style: normal;
+}
+
+.adm-viol i {
+  color: var(--faint);
+  font-size: 11.5px;
+  font-style: normal;
+}
+
+.adm-details {
+  margin-top: 12px;
+  font-size: 12.5px;
+}
+
+.adm-details summary {
+  padding: 6px 0;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.adm-details summary:hover {
+  color: var(--fg);
+}
+
+/* 회차 줄. 표로 만들면 헤드라인이 잘려서 목록형으로 둔다 */
+.adm-briefs,
+.adm-pending {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.adm-brief {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) auto;
+  gap: 2px 14px;
+  padding: 10px 0 11px;
+  border-bottom: 1px solid var(--line);
+}
+
+.adm-brief-date {
+  font-weight: 600;
+}
+
+.adm-brief-date i {
+  display: block;
+  font-size: 11.5px;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--faint);
+}
+
+.adm-brief-head {
+  min-width: 0;
+}
+
+.adm-brief-head a:hover {
+  color: var(--accent);
+}
+
+.adm-brief-meta {
+  grid-column: 2;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.adm-brief-meta strong {
+  color: var(--up);
+}
+
+.adm-brief-num {
+  grid-row: 1 / span 2;
+  grid-column: 3;
+  text-align: right;
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.adm-brief-num em,
+.adm-brief-num i {
+  display: block;
+  font-style: normal;
+}
+
+.adm-brief-num i {
+  color: var(--up);
+}
+
+/* 왼쪽 표시선 하나로 상태를 가른다. 바탕을 채우지 않는다 */
+.adm-brief.bad {
+  border-left: 2px solid var(--up);
+  padding-left: 10px;
+}
+
+.adm-brief.late {
+  border-left: 2px solid var(--faintest);
+  padding-left: 10px;
+}
+
+.adm-pending li {
+  padding: 9px 0 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--up);
+}
+
+.adm-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin: 0;
+}
+
+.adm-toggle button {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.adm-toggle button:hover {
+  color: var(--fg);
+  border-color: var(--fg);
+}
+
+/* 로그인. 콘솔 안이 아니라 콘솔을 통째로 대신 그리는 화면이다 */
+.adm-login {
+  margin: clamp(60px, 12vh, 140px) auto;
+  max-width: 300px;
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.adm-login h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.adm-login p {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.adm-login input {
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 13.5px;
+}
+
+.adm-login input:focus {
+  outline: none;
+  border-color: var(--fg);
+}
+
+.adm-login button {
+  padding: 9px 11px;
+  border: 1px solid var(--rule-strong);
+  background: var(--rule-strong);
+  color: #fff;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.adm-login button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.adm-login-err {
+  margin: 0;
+  color: var(--up);
+  font-size: 12.5px;
+}
+
+/* ---------- 방문 그래프 ---------- */
+
+.vz {
+  margin-top: 4px;
+}
+
+.vz-max {
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+.vz-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  margin: 4px 0 26px;
+  padding: 0;
+  height: 132px;
+  list-style: none;
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.vz-bar {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 3px;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.vz-fill {
+  display: block;
+  width: 100%;
+  min-height: 1px;
+  background: var(--accent);
+}
+
+/* 기록이 없는 날. 0을 안 그리면 빈 칸과 구별이 안 된다 */
+.vz-fill--zero {
+  background: var(--line);
+  height: 1px;
+}
+
+.vz-bar em {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  padding-top: 5px;
+  font-size: 10.5px;
+  font-style: normal;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+/* ---------- 순위 막대 ---------- */
+
+.ranks {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.rank {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 8px 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+/* 막대는 글자 뒤에 깔린 띠다. 숫자와 나란히 놓으면 좁은 화면에서 둘 다 잘린다 */
+.rank-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgba(37, 99, 235, 0.09);
+}
+
+.rank-label,
+.rank-num {
+  position: relative;
+}
+
+.rank-label i {
+  margin-left: 7px;
+  font-size: 11px;
+  font-style: normal;
+  color: var(--faint);
+}
+
+.rank-num {
+  text-align: right;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rank-num small {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--faint);
+}
+
+.bar-cell {
+  position: relative;
+  display: inline-block;
+  min-width: 68px;
+  padding: 1px 4px;
+}
+
+.bar-cell-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgba(37, 99, 235, 0.11);
+}
+
+.bar-cell b {
+  position: relative;
+  font-weight: 600;
 }

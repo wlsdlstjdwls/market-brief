@@ -4,6 +4,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Noto_Sans_KR } from "next/font/google";
 import Link from "next/link";
 import TopNav from "../components/TopNav";
+import VisitTracker from "../components/VisitTracker";
 import { NAV } from "../lib/nav";
 import {
   GOOGLE_VERIFICATION,
@@ -127,8 +128,14 @@ export default function RootLayout({
         <Header />
         <main>{children}</main>
         {/*
-          방문 통계와 속도 계측. 쿠키를 쓰지 않고 개인을 식별하지 않으므로
-          지금의 "수집하는 개인정보 없음" 상태를 바꾸지 않는다.
+          방문 한 줄을 우리 page_view 표에 적는다. 유입 경로를 보려면 이게 있어야 한다 —
+          Vercel Analytics는 관리자 화면에 숫자를 못 꽂아 준다.
+          개인정보 처리방침 시행일(analytics.ts의 ANALYTICS_START) 전에는 라우트가
+          한 줄도 안 적으므로 여기 붙여 둬도 그때까지는 아무 일이 없다.
+        */}
+        <VisitTracker />
+        {/*
+          속도 계측과 Vercel 쪽 통계. 쿠키를 쓰지 않고 개인을 식별하지 않는다.
           프로덕션 배포에서만 실제로 전송된다.
         */}
         <Analytics />

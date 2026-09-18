@@ -47,6 +47,16 @@
 | `scripts/make-og.mjs` | 공유 카드(og:image) PNG를 굽는다. 문구·색을 바꾸면 다시 돌린다 |
 | `scripts/make-icons.mjs` | 파비콘·앱 아이콘을 굽는다. 마크나 색을 바꾸면 다시 돌린다 |
 | `src/app/api/cron/dispatch/route.ts` | Vercel Cron이 때리는 트리거. GitHub 워크플로를 workflow_dispatch로 깨운다 |
+| `src/lib/admin-auth.ts` | 콘솔 출입. env 두 줄 + 서명 쿠키. 회원 표는 없다 |
+| `src/lib/admin.ts` | 콘솔이 읽는 값. 발행 현황, 회차 목록, 차단 로그. **읽기만 한다** |
+| `src/lib/analytics.ts` | 방문 집계. 봇 거르기, 유입 채널 표, 질의. **웹이 DB에 쓰는 유일한 자리** |
+| `src/app/admin/*` | 대시보드, 방문, 회차, 차단 로그 네 화면 |
+| `src/app/api/track/route.ts` | 방문 한 줄 받기. 답은 언제나 204 |
+| `src/components/VisitTracker.tsx` | 방문 비콘. 화면에는 아무것도 안 그린다 |
+| `src/components/SessionTabs.tsx` | 회차 탭. 켜진 회차는 `<html data-session>`이 쥔다 |
+| `src/app/privacy/page.tsx` | 개인정보 처리방침. 시행일 = `ANALYTICS_START` |
+| `scripts/add-page-view.ts` | `page_view` 표 추가 (1회성, 2026-09-18 적용 완료, 아무것도 지우지 않음) |
+| `scripts/admin-password.mjs` | 관리자 비밀번호 해시를 찍는다 |
 
 배치 파일은 ASCII로만 쓴다. cmd.exe가 한글 배치 텍스트를 깨뜨려 실행 자체가 실패한다
 (기존 `../*.bat`들도 전부 영문인 이유다). 설명은 이 문서에 쓴다.
@@ -350,6 +360,138 @@ secret이 없으면 스크립트가 조용히 끝낸다(exit 0).
   않는다. **이메일을 받는 순간 필수가 된다**(개인정보 보호법 제30조) — 폼·라우트·방침을
   한 커밋에 묶는다.
 
+## 관리자 콘솔 (2026-09-18 추가)
+
+`/admin`. 운영자 혼자 쓰는 화면이고 **DB를 읽기만 한다.** 회차를 다시 넣거나 발송하는 일은
+여전히 `ingest.ts`와 `notify-telegram.ts`가 한다 — 콘솔에 버튼을 달지 않았다.
+`zipgonggo`(`C:\Users\cware\project\zipgonggo`)의 같은 구조를 옮겨 왔다.
+
+| 화면 | 보는 것 |
+|---|---|
+| `/admin` 대시보드 | 오늘 회차가 나갔나, 발송 대기, 방문 요약, 발행 통계, 최근 10회차, 차단 실패 |
+| `/admin/visitors` 방문 | 동시접속, 일별 막대, 인기 경로, **유입 채널**, SNS 유입 비중, 기간 칩(1일~1년) |
+| `/admin/briefs` 회차 | 전체 회차 표. 원고·게시·발송 시각과 카드·링크 수. **빈 칸에 의미가 있다** |
+| `/admin/audit` 차단 로그 | `publish_audit`의 실패 줄. guard가 무엇을 걸렀나 |
+
+### 출입
+
+**환경변수 두 줄이 계정 전부다.** 회원 표도 가입도 비밀번호 찾기도 없다.
+
+    ADMIN_EMAIL          로그인 아이디
+    ADMIN_PASSWORD_HASH  scrypt 해시. 평문은 어디에도 두지 않는다
+
+    npm run admin:password "고를 비밀번호"     # 해시를 찍는다
+    vercel env add ADMIN_EMAIL production
+    vercel env add ADMIN_PASSWORD_HASH production
+
+- **둘 중 하나라도 비면 `/admin`이 404다.** 값을 안 정한 배포에서 빈 문자열끼리
+  맞아떨어져 아무나 들어오는 사고를 원천에서 막는다. 로컬에서 `.env.local`에 넣지 않으면
+  콘솔이 아예 안 열리는 게 정상이다.
+- **해시 구분자가 `$`면 안 된다.** Next의 env 로더가 `.env` 값에서 `$16384`를 변수 참조로
+  읽어 통째로 빈 문자열로 만든다. 그래서 `scrypt:N:r:p:salt:key` 꼴이다.
+- 쿠키에는 비밀번호도 해시도 안 싣는다. `만료시각 + 이메일 + HMAC` 쪽지 한 장이고
+  **서명 열쇠가 해시 자체**라 비밀번호를 바꾸면 발급해 둔 쪽지가 전부 한꺼번에 죽는다.
+- **로그인 화면에 URL을 따로 주지 않는다.** 안 들어온 사람에게는 `admin/layout.tsx`가
+  children 대신 로그인 칸을 그린다. `/admin/login` 같은 자리를 만들면 그 자리만 가드를
+  비껴가야 해서 「예외 경로」가 생긴다.
+- 실패 10회/10분이면 잠근다. 함수 인스턴스마다 따로라 완벽하지 않으니 **비밀번호를 길게** 잡는다.
+- **12자 미만은 `--force`를 붙여야 해시가 나온다.** 계정이 하나뿐이라 공격자가 아이디를
+  맞힐 필요가 없고, 시도 제한도 인스턴스마다 따로 세므로 길이 말고는 막을 것이 없다.
+  지금 로컬(`.env.local`)에는 사용자 지시로 **짧은 숫자 비밀번호**가 들어 있다 —
+  공개 트래픽이 붙기 전에 긴 값으로 갈아 끼우고 Production에도 같이 넣는다.
+
+### 방문 집계
+
+**Vercel Analytics로는 이 화면을 못 만든다** — 관리자 화면에 숫자를 꽂아 주지 않고
+유입 채널을 묶어 주지도 않는다. 그래서 `page_view` 표를 따로 뒀다. Vercel Analytics는
+속도 계측용으로 그대로 둔다.
+
+    브라우저(VisitTracker) --sendBeacon--> POST /api/track --> Neon page_view
+    콘솔 --> analytics.ts 질의 --> 화면
+
+- **여기가 웹이 DB에 쓰는 유일한 자리다.** 답은 언제나 204다 — 봇이든 못 쓸 값이든
+  알려줄 이유가 없고, 집계가 실패해도 독자 화면은 멀쩡해야 한다.
+- **적는 것은 넷뿐이다** — 브라우저가 만든 난수 UUID, 경로, 유입 **도메인**, 시각.
+  IP도 User-Agent도 쿼리스트링도 안 적는다(UA는 봇을 거르는 데만 쓰고 버린다).
+- **`?s=am`은 떼고 적는다.** 그래서 아침판과 마감판이 인기 경로에서 한 줄로 합쳐진다.
+  회차별로 보려면 쿼리를 받아야 하는데 거기 무엇이 실려 올지 우리가 정하지 못한다.
+- **봇은 세 겹으로 막는다.** ① 집계가 JS 비콘이라 스크립트를 안 도는 크롤러는 애초에 못
+  들어온다 ② 라우트의 UA 정규식 ③ `navigator.webdriver`. **`naver`를 막으면 안 된다** —
+  네이버 앱 인앱 브라우저 UA에 그 글자가 있다(진짜 사람이다). 크롤러는 `Yeti`·`Daumoa`다.
+- **콘솔에 들어온 브라우저는 집계에서 빠진다**(`admin-nav.tsx`가 표식을 심는다).
+  값이 없을 때만 심으므로 방문 화면의 토글로 되켤 수 있다. 매번 덮어쓰면 그 토글이
+  한 번도 안 먹는다.
+- 유입 도메인은 `analytics.ts`의 `CHANNELS` 표로 접는다. **위에서 먼저 맞는 것이 이긴다** —
+  `cafe.naver.com`이 `naver.com`보다 위에 있어야 카페가 「네이버 기타」로 안 먹힌다.
+  여기 없는 도메인은 이름 그대로 「기타」로 뜬다. 자주 보이면 표에 더한다.
+- **카카오톡·텔레그램 인앱 브라우저는 referrer를 안 준다.** 거기서 온 사람은 「직접 유입」에
+  들어가므로 SNS 숫자는 **하한**이다. 화면에도 그렇게 적어 뒀다.
+- 12개월이 지난 줄은 지운다. 크론을 따로 두지 않고 `/api/track`이 100번에 한 번 치운다.
+- `page_view` 표는 `scripts/add-page-view.ts`로 만들었다(1회성, 2026-09-18 적용 완료,
+  아무것도 지우지 않는다). `npm run db:push`를 그냥 돌리지 않는 이유는 기존과 같다.
+
+### 개인정보 처리방침을 다시 세웠다
+
+09-15에 지웠던 `/privacy`를 되살렸다. **무작위 식별자라도 사람을 하나로 묶어 세는 이상
+방침이 먼저 서야 한다**(개인정보 보호법 제30조).
+
+- **시행일과 집계 시작일은 같은 값이어야 한다.** `analytics.ts`의 `ANALYTICS_START`
+  하나를 `/privacy`가 그대로 읽어 찍는다. 한쪽만 옮기면 「방침은 아직인데 적고 있다」가 된다.
+- 그날 전에는 `/api/track`이 **한 줄도 안 적는다.** 그래서 숫자가 0이면 방문 화면이
+  「집계가 아직 안 켜졌다」를 같이 띄운다 — 0과 꺼짐을 구분할 방법이 없으면 안 된다.
+- 지금도 **이메일은 받지 않는다.** 구독 폼을 다시 붙이면 방침·폼·라우트를 한 커밋에 묶는다.
+
+### 색인
+
+`/admin`은 세 겹으로 막는다 — `robots.ts`의 `Disallow: /admin`, 페이지의
+`robots: { index: false }`(`admin/layout.tsx`), 계정이 없으면 404를 내는 레이아웃 자체.
+**robots.txt는 크롤러에게 부탁하는 것일 뿐**이라 이것만 믿으면 안 된다.
+`/privacy`는 반대로 sitemap에 넣었다 — 법정 고지라 검색으로도 닿아야 한다.
+
+## 회차 탭이 느렸던 이유 (2026-09-18)
+
+탭을 누르면 화면이 0.8초씩 멈췄다(사용자 지적). **인덱스 문제가 아니었다** — 78행짜리
+표에 유니크 인덱스가 이미 있다. 셋이 겹쳐 있었다.
+
+| | 측정 |
+|---|---|
+| 홈 `/` | `X-Vercel-Cache: HIT`, TTFB 47~66ms |
+| `/brief/{날짜}` | 늘 `MISS`, TTFB 740~820ms (warm에서도) |
+| `X-Vercel-Id` | `icn1::iad1` — 엣지는 서울, **함수는 버지니아** |
+
+1. **`searchParams`를 읽어서 `revalidate = 300`이 죽어 있었다.** 응답이
+   `private, no-cache, no-store`였다. CLAUDE.md가 홈에서 지적한 그 함정인데
+   **날짜 페이지에 그대로 남아 있었다** — `?s=am`뿐 아니라 기본 URL도 캐시가 안 됐다.
+2. **함수 리전이 `iad1`, Neon은 `sin1`.** 질의 왕복마다 태평양을 건넜다(~230ms).
+3. **`getBrief`가 직렬 질의 2~3회** — 최근 날짜, 그 날짜의 회차, 그 회차의 카드.
+
+고친 것:
+
+- **`vercel.json`에 `"regions": ["sin1"]`.** DB와 같은 리전에 함수를 둔다.
+  서울(`icn1`)에 두면 사용자와는 가깝지만 질의마다 싱가포르를 왕복한다 — 질의 수가
+  늘수록 손해라 DB 쪽에 붙였다. **`vercel deploy --prod`를 해야 리전이 바뀐다.**
+- **`getBriefDay()`가 회차와 카드를 질의 한 번에 받는다.** 날짜를 안 주면 「가장 최근
+  날짜」까지 같은 질의 안에서 고른다. `getBrief()`는 그 결과에서 한 회차를 고르는 얇은 껍데기다.
+- **날짜 페이지가 `searchParams`를 안 읽는다.** 그날 회차를 **둘 다 구워** 보내고
+  브라우저가 고른다. `generateStaticParams`로 발행된 48일치를 미리 굽는다.
+
+### 탭이 도는 방식
+
+**`<html data-session>` 한 값이 본문과 탭을 같이 뒤집는다.** CSS가 한다(`globals.css`).
+
+- 그 값은 페이지의 **인라인 스크립트가 그리기 전에** 넣는다. `useEffect`로 하면 마감판이
+  한 번 그려졌다가 아침판으로 바뀌어 깜빡이는데, **텔레그램 아침 알림이 `?s=am`으로 바로
+  보내므로** 그 깜빡임이 주 진입 경로에서 난다.
+- **`useSearchParams`를 쓰면 안 된다.** 프리렌더된 라우트에서 그 훅을 부르면 가장 가까운
+  Suspense 경계까지가 클라이언트 렌더로 떨어져 첫 화면이 빈다.
+- **두 회차가 한 문서에 있으므로 섹션 id가 겹친다.** `BriefView`의 `idPrefix`가 막는다
+  (아침판은 `am-news`). 안 붙이면 목차 앵커가 숨은 쪽으로 튄다.
+- 기본값은 마감 브리핑이다. **자바스크립트가 꺼져 있어도 마감판이 보이고** 탭은 평범한
+  링크라 그대로 눌린다.
+- **잃은 것 하나** — 공유 카드의 `og:description`이 회차별로 안 갈린다. `?s=am`으로 들어와도
+  마감판 헤드라인이 나간다. 회차를 가리려면 서버가 `searchParams`를 읽어야 하고 그러면
+  ISR이 다시 죽는다. canonical도 `/brief/{날짜}` 하나로 모았다.
+
 ## 명령
 
 ```bash
@@ -359,6 +501,8 @@ npm run guard -- <파일|폴더>  # 원본에 어떤 종목 표기가 있는지
 npm run ingest -- --dry-run  # DB 없이 적재 결과 미리보기
 npm run verify               # DB의 published 브리핑 검사
 npm run notify -- --dry-run  # 텔레그램에 나갈 문구 미리보기 (발송 안 함)
+npm run admin:password "비밀번호"  # 관리자 해시 (평문은 저장하지 않는다)
+npm run db:page-view         # page_view 표 만들기 (1회성, 이미 적용됨)
 
 npm run ingest -- --date 2026-09-08 --session am --dry-run   # 오전판만 미리보기
 npm run ingest -- --session pm --skip-missing --publish       # 그 회차가 아직 없으면 실패 대신 스킵
@@ -575,6 +719,12 @@ vercel deploy --prod
   구글은 DNS TXT로도 되지만 **네이버는 메타태그나 파일만 받는다.** 값을 넣었으면
   `vercel deploy --prod`를 해야 뜬다(빌드 시점 값)
 - 공유 카드, 파비콘, robots, sitemap, RSS, 404, Analytics 전부 라이브 (위 "론칭 준비" 절)
+- **관리자 콘솔 `/admin` 작업 완료, 아직 배포 안 함** (위 "관리자 콘솔" 절). 배포 전에
+  `ADMIN_EMAIL`·`ADMIN_PASSWORD_HASH`를 Production에 넣어야 한다 — 없으면 `/admin`이 404다
+- **`page_view` 표 생성 완료** (2026-09-18). 방문 집계는 `ANALYTICS_START`(=처리방침 시행일)
+  2026-09-18부터 적기 시작한다. `/privacy`도 같은 날 다시 세웠다
+- **회차 탭 지연 수정 완료, 아직 배포 안 함** (위 "회차 탭이 느렸던 이유" 절).
+  `vercel.json`에 `regions: ["sin1"]`을 더했으므로 **`vercel deploy --prod`를 해야 리전이 바뀐다**
 - 브랜드 마크 한 벌(헤더 로고, favicon.ico, apple-icon, manifest, theme-color) **작업 완료,
   아직 배포 안 함** — `vercel deploy --prod` 필요 (위 "브랜드 마크와 앱 아이콘" 절)
 - `NEXT_PUBLIC_CONTACT_EMAIL` **채움** (2026-09-18). 값은 운영자 개인 메일이고 Production에만
@@ -887,6 +1037,9 @@ KRX가 풀리거나 다른 소스를 찾기 전까지 과거 회차의 업종은
 - 리포트 산문에서 숫자 파싱
 - 수집 실패한 수치를 추정값으로 채우기
 - 푸시로 배포 트리거하기
+- 날짜 페이지에서 `searchParams` 읽기 (ISR이 죽는다 — 위 "회차 탭이 느렸던 이유")
+- 관리자 콘솔에서 DB 쓰기 (로그인 쿠키 말고는 읽기 전용이다)
+- 방문 집계에 IP·User-Agent·쿼리스트링 적기 (처리방침과 어긋난다)
 
 <!-- BEGIN:nextjs-agent-rules -->
 

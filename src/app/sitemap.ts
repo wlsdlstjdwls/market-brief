@@ -32,6 +32,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "daily",
       priority: 0.6,
     },
+    {
+      // 거의 안 바뀌지만 색인에는 있어야 한다 — 법정 고지라 검색으로도 닿아야 하는 지면이다
+      url: `${SITE_URL}/privacy`,
+      changeFrequency: "yearly",
+      priority: 0.2,
+    },
     ...briefs.map((b) => ({
       url: `${SITE_URL}/brief/${b.tradeDate}`,
       lastModified: new Date(`${b.tradeDate}T00:00:00+09:00`),

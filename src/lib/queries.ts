@@ -1,6 +1,6 @@
-import { and, desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { db, hasDb } from "../db/index";
-import { dailyBrief, briefTopic } from "../db/schema";
+import { dailyBrief } from "../db/schema";
 
 export type Brief = typeof dailyBrief.$inferSelect;
 export type Session = "am" | "pm";
@@ -70,58 +70,102 @@ export async function listBriefs(limit = 60): Promise<BriefListItem[]> {
   }
 }
 
+/** 화면이 쓰는 회차 한 벌. 카드가 회차 안에 같이 들어 있다. */
+export interface BriefDayItem {
+  brief: {
+    id: number;
+    tradeDate: string;
+    session: Session;
+    runId: string;
+    writtenAt: string | null;
+    publishedAt: string | null;
+    headline: string;
+    summary: string;
+    macroCommentary: string;
+    marketSummary: string;
+    sources: unknown;
+  };
+  topics: Array<{
+    kind: string;
+    rank: number;
+    title: string;
+    impact: string;
+    lines: unknown;
+    sources: unknown;
+  }>;
+}
+
 /**
- * 한 회차를 읽는다.
+ * 한 날짜에 발행된 회차를 **전부** 읽는다. 카드까지 **질의 한 번**에 받는다.
+ *
+ * 전에는 ① 최근 날짜 ② 그 날짜의 회차 ③ 그 회차의 카드를 세 번 나눠 물었다.
+ * Neon HTTP 드라이버는 질의마다 연결을 새로 열고, 함수와 DB가 다른 대륙에 있으면
+ * 왕복 한 번이 200ms를 넘는다 — 그것만으로 0.5초가 나갔다.
+ * `COALESCE`로 「날짜를 안 주면 가장 최근 날짜」까지 같은 질의 안에서 고른다.
+ *
+ * 회차를 골라 주지 않고 둘 다 돌려주는 이유는 화면 쪽 사정이다 — 날짜 페이지가
+ * `searchParams`를 읽지 않아야 ISR 캐시가 산다. 탭 전환은 브라우저가 한다.
  *
  * @param tradeDate 비우면 가장 최근 발행 날짜
- * @param session   비우면 그 날짜에 있는 것 중 마감 종합 우선
- *
- * sessions에는 그 날짜에 발행된 회차가 전부 담긴다. 화면의 탭이 이걸 보고 그려진다.
  */
-export async function getBrief(tradeDate?: string, session?: Session) {
-  if (!hasDb()) return null;
+export async function getBriefDay(tradeDate?: string): Promise<BriefDayItem[]> {
+  if (!hasDb()) return [];
   try {
-    const date = tradeDate ?? (await latestDate());
-    if (!date) return null;
+    const target = tradeDate
+      ? sql`${tradeDate}::date`
+      : sql`(SELECT max(trade_date) FROM daily_brief WHERE status = 'published')`;
 
-    const rows = await db
-      .select()
-      .from(dailyBrief)
-      .where(and(eq(dailyBrief.tradeDate, date), eq(dailyBrief.status, "published")));
-    if (!rows.length) return null;
+    const res = await db.execute<BriefDayItem["brief"] & { topics: BriefDayItem["topics"] }>(
+      sql`SELECT b.id,
+                 b.trade_date::text                    AS "tradeDate",
+                 b.session::text                       AS session,
+                 b.run_id                              AS "runId",
+                 b.written_at                          AS "writtenAt",
+                 b.published_at                        AS "publishedAt",
+                 b.headline,
+                 b.summary,
+                 b.macro_commentary                    AS "macroCommentary",
+                 b.market_summary                      AS "marketSummary",
+                 b.sources,
+                 (SELECT coalesce(jsonb_agg(
+                           jsonb_build_object('kind', t.kind, 'rank', t.rank, 'title', t.title,
+                                              'impact', t.impact, 'lines', t.lines,
+                                              'sources', t.sources)
+                           ORDER BY t.kind, t.rank), '[]'::jsonb)
+                    FROM brief_topic t WHERE t.brief_id = b.id) AS topics
+            FROM daily_brief b
+           WHERE b.status = 'published' AND b.trade_date = ${target}`,
+    );
+    const rows = (Array.isArray(res) ? res : (res as { rows: unknown[] }).rows) as Array<
+      BriefDayItem["brief"] & { topics: BriefDayItem["topics"] }
+    >;
 
-    const sessions = SESSION_ORDER.filter((s) => rows.some((r) => r.session === s));
-    // 요청한 회차가 그날 없으면(오전만 있는 날에 pm 요청 등) 있는 것으로 떨어진다.
-    const picked =
-      (session && rows.find((r) => r.session === session)) ??
-      rows.find((r) => r.session === "pm") ??
-      rows[0];
-    if (!picked) return null;
-
-    /*
-     * 화면이 뉴스만 싣기 때문에 지수, 금리, 수급, 업종은 더 이상 읽지 않는다.
-     * 테이블과 수집 파이프라인은 그대로 있으니 되살리려면 여기에 조회를 다시 넣으면 된다.
-     */
-    const topics = await db
-      .select()
-      .from(briefTopic)
-      .where(eq(briefTopic.briefId, picked.id))
-      .orderBy(briefTopic.kind, briefTopic.rank);
-
-    return { brief: picked, topics, sessions };
+    // 탭 순서와 같게 정렬해 둔다. 화면이 순서를 다시 만들 이유가 없다.
+    return SESSION_ORDER.flatMap((s) => {
+      const r = rows.find((x) => x.session === s);
+      if (!r) return [];
+      const { topics, ...brief } = r;
+      return [{ brief, topics: topics ?? [] }];
+    });
   } catch (e) {
-    console.error("getBrief 실패:", e);
-    return null;
+    console.error("getBriefDay 실패:", e);
+    return [];
   }
 }
 
-/** 가장 최근 발행 날짜 하나. 회차가 둘이어도 날짜는 하나다. */
-async function latestDate(): Promise<string | null> {
-  const [row] = await db
-    .select({ tradeDate: dailyBrief.tradeDate })
-    .from(dailyBrief)
-    .where(eq(dailyBrief.status, "published"))
-    .orderBy(desc(dailyBrief.tradeDate))
-    .limit(1);
-  return row?.tradeDate ?? null;
+/**
+ * 한 회차만. 홈과 아카이브처럼 탭이 없는 자리가 쓴다.
+ *
+ * @param session 비우면 마감 브리핑 우선
+ */
+export async function getBrief(tradeDate?: string, session?: Session) {
+  const items = await getBriefDay(tradeDate);
+  if (!items.length) return null;
+  const sessions = items.map((i) => i.brief.session);
+  // 요청한 회차가 그날 없으면(아침판만 있는 날에 pm 요청 등) 있는 것으로 떨어진다.
+  const picked =
+    (session && items.find((i) => i.brief.session === session)) ??
+    items.find((i) => i.brief.session === "pm") ??
+    items[0];
+  return { brief: picked.brief, topics: picked.topics, sessions };
 }
