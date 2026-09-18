@@ -15,10 +15,13 @@ async function rows<T extends Record<string, unknown>>(text: string): Promise<T[
   return (Array.isArray(res) ? res : (res as { rows: T[] }).rows) as T[];
 }
 
-/** 회차 라벨. 화면 문구는 `queries.ts`의 `SESSION_LABEL`과 같은 말을 쓴다 */
-export const SESSION_LABEL: Record<string, string> = { am: "아침 브리핑", pm: "마감 브리핑" };
-
-export type Session = "am" | "pm";
+/*
+ * 라벨과 시각 포맷은 `admin-format.ts`에 있다 — 클라이언트 컴포넌트도 쓰는 순수 함수라
+ * DB를 들여오는 이 파일에 두면 브라우저 번들에 드라이버가 딸려 온다.
+ * 기존 호출부가 그대로 돌게 여기서 다시 내보낸다.
+ */
+export { SESSION_LABEL, stamp, ago, type Session } from "./admin-format";
+import type { Session } from "./admin-format";
 
 /** 한 회차 한 줄. 목록과 대시보드가 같은 모양을 쓴다 */
 export type BriefRow = {
@@ -223,27 +226,4 @@ export async function auditSummary(): Promise<
             count(*) FILTER (WHERE result = 'fail')::int AS fail
        FROM publish_audit GROUP BY 1 ORDER BY 1`,
   );
-}
-
-// ── 표기 ──────────────────────────────────────────────────────────
-
-/** `2026-09-18T16:43` → `16:43`. 날짜가 거래일과 다르면 날짜도 같이 찍는다 */
-export function stamp(iso: string | null, tradeDate?: string): string {
-  if (!iso) return "—";
-  const [d, t] = iso.split("T");
-  if (!t) return d;
-  return tradeDate && d !== tradeDate ? `${d.slice(5).replace("-", ".")} ${t}` : t;
-}
-
-/** 지난 시간을 사람 말로. 「방금」 「23분 전」 「3일 전」 */
-export function ago(iso: string | null): string {
-  if (!iso) return "—";
-  // to_char가 KST 벽시계를 주므로 KST 오프셋을 붙여 되읽는다
-  const then = Date.parse(`${iso}:00+09:00`);
-  if (!then) return "—";
-  const min = Math.floor((Date.now() - then) / 60_000);
-  if (min < 1) return "방금";
-  if (min < 60) return `${min}분 전`;
-  if (min < 60 * 24) return `${Math.floor(min / 60)}시간 전`;
-  return `${Math.floor(min / (60 * 24))}일 전`;
 }
