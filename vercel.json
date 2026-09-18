@@ -4,9 +4,9 @@
     "deploymentEnabled": false
   },
   "crons": [
-    { "path": "/api/cron/dispatch?s=am", "schedule": "10 23 * * 0-4" },
-    { "path": "/api/cron/dispatch?s=am", "schedule": "40 0 * * 1-5" },
+    { "path": "/api/cron/dispatch?s=am", "schedule": "10,20,30,40,50 23 * * 0-4" },
+    { "path": "/api/cron/dispatch?s=am&n=2", "schedule": "0 0 * * 1-5" },
     { "path": "/api/cron/dispatch?s=pm", "schedule": "40 7 * * 1-5" },
-    { "path": "/api/cron/dispatch?s=pm", "schedule": "40 9 * * 1-5" }
+    { "path": "/api/cron/dispatch?s=pm&n=2", "schedule": "40 9 * * 1-5" }
   ]
 }

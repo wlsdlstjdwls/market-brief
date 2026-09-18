@@ -47,14 +47,15 @@ function kstNow(): { date: string; hour: number } {
   };
 }
 
-/** 오전 슬롯(08:10, 09:40)이면 프리마켓판, 오후 슬롯(16:40, 18:40)이면 마감 종합판. */
+/** 오전 슬롯(08:10~09:00)이면 프리마켓판, 오후 슬롯(16:40, 18:40)이면 마감 종합판. */
 function sessionOf(hour: number): Session {
   return hour < 12 ? "am" : "pm";
 }
 
 /**
  * 이미 published면 부르지 않는다.
- * 재시도 슬롯이 회차마다 도는데, 첫 슬롯이 받아 갔으면 러너를 깨울 이유가 없다
+ * 오전은 08:10부터 09:00까지 10분마다 두드리는데(원고 푸시가 07:51~08:08로 퍼져 있다),
+ * 첫 슬롯이 받아 갔으면 나머지가 러너를 깨울 이유가 없다
  * (워크플로 안에도 같은 검사가 있지만 그건 체크아웃까지 다 한 뒤다).
  */
 async function alreadyPublished(date: string, session: Session): Promise<boolean> {
