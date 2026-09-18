@@ -41,6 +41,7 @@
 | `scripts/update_web.bat` | 일일 갱신 (수집 → 적재 → 검증). 작업 스케줄러가 부른다 |
 | `scripts/install_update_web_task.bat` | 위 작업을 평일 16:10에 등록 |
 | `scripts/backfill.py` | 과거 회차 일괄 적재 |
+| `scripts/make-og.mjs` | 공유 카드(og:image) PNG를 굽는다. 문구·색을 바꾸면 다시 돌린다 |
 | `src/app/api/cron/dispatch/route.ts` | Vercel Cron이 때리는 트리거. GitHub 워크플로를 workflow_dispatch로 깨운다 |
 
 배치 파일은 ASCII로만 쓴다. cmd.exe가 한글 배치 텍스트를 깨뜨려 실행 자체가 실패한다
@@ -219,6 +220,45 @@ KRX(data.krx.co.kr)가 이 PC의 IP를 차단한다. 응답이 JSON이 아니라
 `proseOnly`가 이미 버렸으므로 가리킬 내용이 없는 빈 제목이다.
 
 `markdown.ts`의 `NOISE_LINE`(구분선)과 `EMPTY_PARA`(굵은 글씨만 있는 문단)가 막는다.
+
+## 론칭 준비 (2026-09-18)
+
+공유·색인·계측이 통째로 비어 있었다. 여덟 가지를 채웠다.
+
+| 파일 | 하는 일 |
+|---|---|
+| `src/lib/site.ts` | 절대 URL·사이트 이름·설명·문의 주소. 한 군데서 읽는다 |
+| `src/app/opengraph-image.png` | 공유 카드 1200×630. `scripts/make-og.mjs`가 굽는다 |
+| `src/app/icon.svg` | 파비콘 |
+| `src/app/robots.ts` · `sitemap.ts` | 색인. `/api/*`는 막는다 |
+| `src/app/rss.xml/route.ts` | RSS 2.0 |
+| `src/app/not-found.tsx` · `error.tsx` | 404와 렌더 실패 |
+| `@vercel/analytics` · `@vercel/speed-insights` | 방문 통계, 속도 |
+
+- **`metadataBase`가 제일 중요하다.** 이게 없으면 OG 이미지와 canonical이 상대 경로로
+  나가고, 카카오톡·슬랙이 못 읽어 미리보기가 통째로 빈다. `next dev`에서는 og:image가
+  `localhost`로 찍히는데 정상이다 — `next build` 결과에서 확인한다.
+- **`SITE_URL`은 `VERCEL_PROJECT_PRODUCTION_URL`을 먼저 본다.** 프리뷰마다 바뀌는
+  `VERCEL_URL`을 쓰면 프리뷰가 뿌린 링크가 사라진 배포를 가리킨다. 도메인을 사면
+  `NEXT_PUBLIC_SITE_URL`로 덮는다.
+- **공유 카드를 `next/og`로 그리지 않았다.** satori가 woff2를 못 읽어 한글 글꼴을 TTF로
+  실어야 하는데 Noto Sans KR 원본이 수 MB다. 글자가 고정된 카드라 `sharp`로 미리 구워
+  두면 서버에 글꼴이 필요 없다. 문구나 색을 바꾸면 `node scripts/make-og.mjs`를 다시 돌린다.
+- **브리핑 페이지의 `og:description`은 그날 헤드라인이다.** 공유 카드에서 눈에 들어오는
+  건 사이트 설명이 아니라 그날 무슨 일이 있었나다. `generateMetadata`와 본문이 같은
+  회차를 읽으므로 `react`의 `cache`로 감싸 DB를 한 번만 친다.
+- **RSS는 본문을 싣지 않는다.** 헤드라인과 한 줄 요약만이다. 종목 차단의 마지막 방어선이
+  렌더 단계(`renderMarkdown`)인데 피드는 그 경로를 타지 않는다. 본문을 통째로 실으면
+  방어선 하나가 빠진 채 나가므로 `scan`으로 한 번 더 보고 걸리면 그 항목을 통째로 뺀다.
+- **문의 주소는 `NEXT_PUBLIC_CONTACT_EMAIL`이 있을 때만 그린다.** 개인 메일 주소를 공개
+  사이트에 박는 건 되돌리기 어려운 결정이라 코드에 넣지 않았다. 유료 전환 시에는
+  전자상거래법 제13조상 표시 의무라 반드시 채워야 한다.
+- **홈과 `/brief/{최신}`이 같은 내용인 건 그대로 뒀다.** 둘 다 자기 자신을 canonical로
+  가리킨다. 홈의 canonical을 날짜 페이지로 돌리면 첫 화면이 색인에서 빠지고, 반대로
+  돌리면 아카이브가 빠진다. 뉴스 사이트에서 흔한 형태라 손대지 않았다.
+- **개인정보 처리방침은 아직 필요 없다.** Analytics는 쿠키를 쓰지 않고 개인을 식별하지
+  않는다. **이메일을 받는 순간 필수가 된다**(개인정보 보호법 제30조) — 폼·라우트·방침을
+  한 커밋에 묶는다.
 
 ## 명령
 
@@ -683,8 +723,12 @@ KRX가 풀리거나 다른 소스를 찾기 전까지 과거 회차의 업종은
    `gh run list --workflow=daily-update.yml` 순으로 본다.
 3. **기사 링크가 안 보이는 회차를 오해하지 말 것.** 카드별 링크는 09-18 회차부터 원고에
    생겼고, 그 전 회차는 문서 말미 목록만 있거나 링크가 아예 없다. 빈 게 정상이다.
-4. KRX OPEN API 키 발급 → 업종지수 과거 조회 가능 여부 확정 (위 절차 ①②)
-5. 유료 전환 준비는 `docs/유료전환_법적요건.md` 참고 — 사업자등록 → 구매안전서비스 확인증
+4. **론칭 유통은 이미 있는 채널부터.** 상위 저장소의 텔레그램 파이프라인과 유튜브 채널에
+   링크를 흘리는 게 0원이고 신규 인프라가 0이다. 이메일은 리스트를 자산으로 쌓을 때,
+   카카오톡 채널은 사업자등록 후에 붙인다 — 친구톡이 건당 15원 안팎이라 구독 1,000명에
+   하루 두 번이면 월 60만원이고, 같은 물량이 이메일로는 월 3만원이다.
+5. KRX OPEN API 키 발급 → 업종지수 과거 조회 가능 여부 확정 (위 절차 ①②)
+6. 유료 전환 준비는 `docs/유료전환_법적요건.md` 참고 — 사업자등록 → 구매안전서비스 확인증
    → 통신판매업 신고 → 처리방침·약관 게시 → 푸터 표시 항목 추가 → PG 연동 → 해지·환불 화면 순서.
    종목을 안 넣는 한 유사투자자문업 신고는 해당 없음
 
