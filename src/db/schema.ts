@@ -49,6 +49,8 @@ export const dailyBrief = pgTable(
     macroCommentary: text("macro_commentary").notNull(),
     /** 시장 개요 본문 (마크다운) */
     marketSummary: text("market_summary").notNull(),
+    /** [{ label, url }] 그 회차가 인용한 기사. 원고 말미 `## 출처(주요)` 목록에서 온다 */
+    sources: jsonb("sources").notNull().default([]),
     status: briefStatus("status").notNull().default("draft"),
     /** 유료 전환 대비 자리. MVP에서는 전부 'free'. */
     tier: varchar("tier", { length: 16 }).notNull().default("free"),
@@ -80,6 +82,8 @@ export const briefTopic = pgTable(
     impact: varchar("impact", { length: 16 }).notNull().default(""),
     /** [{ label, text }] 순서 그대로 화면에 찍는다 */
     lines: jsonb("lines").notNull(),
+    /** [{ label, url }] 그 카드가 인용한 기사. 매체명만 담는다 (제목에는 종목이 흔하다) */
+    sources: jsonb("sources").notNull().default([]),
   },
   (t) => [index("brief_topic_brief_idx").on(t.briefId, t.kind, t.rank)]
 );

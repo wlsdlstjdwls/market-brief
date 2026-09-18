@@ -20,12 +20,27 @@ function narrative(p: BriefPayload) {
   };
 }
 
+/**
+ * 매체명 관문.
+ *
+ * 산문과 달리 `blocking`만 본다. 영문 매체명이 두 글자 ASCII 종목명과 자주 겹쳐서
+ * (`newspim`의 `new` = NEW, `Yahoo Finance`의 `nc` = 엔씨소프트) review까지 막으면
+ * 링크가 한 장도 안 남는다. URL은 아예 보지 않는다 — `https`의 `tp`가 종목 TP로 걸린다.
+ * 판단 근거는 sources.ts의 같은 주석에 있다.
+ */
+function assertSourcesClean(p: BriefPayload): void {
+  const labels = [...p.sources, ...p.topics.flatMap((t) => t.sources)].map((x) => x.label);
+  const bad = labels.flatMap((l) => scan(l).blocking);
+  if (bad.length) throw new EquityMentionError("persist:sources", bad);
+}
+
 export async function persist(p: BriefPayload, publish: boolean): Promise<number> {
   assertRegistryOnly(p);
 
   // 적재 직전 관문. 실패해도 조용히 넘어가지 않고 감사 로그를 남긴다.
   try {
     assertObjectClean(narrative(p), "persist");
+    assertSourcesClean(p);
   } catch (e) {
     if (e instanceof EquityMentionError) {
       await db.insert(publishAudit).values({
@@ -47,6 +62,7 @@ export async function persist(p: BriefPayload, publish: boolean): Promise<number
     summary: p.summary,
     macroCommentary: p.macroCommentary,
     marketSummary: p.marketSummary,
+    sources: p.sources,
     status: publish ? ("published" as const) : ("draft" as const),
     publishedAt: publish ? new Date() : null,
     updatedAt: new Date(),
@@ -101,7 +117,7 @@ export async function persist(p: BriefPayload, publish: boolean): Promise<number
   if (p.topics.length)
     await db.insert(briefTopic).values(p.topics.map((t) => ({
       briefId, kind: t.kind, rank: t.rank, title: t.title,
-      impact: t.impact, lines: t.lines,
+      impact: t.impact, lines: t.lines, sources: t.sources,
     })));
 
   const check = scan([p.headline, p.summary, p.macroCommentary, p.marketSummary].join("\n"));

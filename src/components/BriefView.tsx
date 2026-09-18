@@ -16,6 +16,8 @@ interface Props {
     headline: string;
     macroCommentary: string;
     marketSummary: string;
+    /** 그 회차가 인용한 기사. jsonb라 모양을 믿지 않고 toSources가 확인한다 */
+    sources?: unknown;
   };
   /** 그날 발행된 회차. 둘이면 탭이 나온다. 하나면 탭을 그리지 않는다. */
   sessions?: Session[];
@@ -27,6 +29,7 @@ interface Props {
     title: string;
     impact: string;
     lines: unknown;
+    sources?: unknown;
   }>;
   recent?: Array<{ tradeDate: string; headline: string }>;
 }
@@ -156,11 +159,13 @@ function TopicCard({
   title,
   impact,
   lines,
+  sources,
 }: {
   ord: number;
   title: string;
   impact: string;
   lines: Array<{ label: string; text: string }>;
+  sources: SourceLink[];
 }) {
   return (
     <article className="topic">
@@ -176,7 +181,41 @@ function TopicCard({
           {renderText(l.text)}
         </p>
       ))}
+      <SourceList links={sources} />
     </article>
+  );
+}
+
+/**
+ * 기사 링크 줄.
+ *
+ * 매체명만 찍는다. 기사 제목을 쓰면 거기에 종목명이 들어 있다("... SK하이닉스 자사주 매입").
+ * sources.ts가 이미 매체명만 남기고 URL까지 검사하지만, 화면에서도 제목을 쓰지 않는다.
+ * 외부로 나가는 링크라 `rel`을 박는다.
+ */
+function SourceList({ links, label = "기사" }: { links: SourceLink[]; label?: string }) {
+  if (!links.length) return null;
+  // 같은 매체의 다른 기사가 여러 건이면 이름이 똑같이 찍힌다. 두 번째부터 번호를 단다.
+  const seen = new Map<string, number>();
+  return (
+    <p className="topic-sources">
+      {label ? <span className="topic-label">{label}</span> : null}
+      {links.map((l) => {
+        const n = (seen.get(l.label) ?? 0) + 1;
+        seen.set(l.label, n);
+        return (
+          <a
+            key={l.url}
+            className="source-chip"
+            href={l.url}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+          >
+            {renderText(n > 1 ? `${l.label} ${n}` : l.label)}
+          </a>
+        );
+      })}
+    </p>
   );
 }
 
@@ -209,6 +248,23 @@ function ImpactMeter({ level }: { level: string }) {
       시장 영향 {level}
     </span>
   );
+}
+
+interface SourceLink {
+  label: string;
+  url: string;
+}
+
+/** jsonb에서 온 링크 배열을 확인한다. http(s) 절대 URL만 받는다. */
+function toSources(v: unknown): SourceLink[] {
+  if (!Array.isArray(v)) return [];
+  return v.flatMap((x) => {
+    if (!x || typeof x !== "object") return [];
+    const { label, url } = x as { label?: unknown; url?: unknown };
+    if (typeof label !== "string" || typeof url !== "string") return [];
+    if (!label || !/^https?:\/\//.test(url)) return [];
+    return [{ label, url }];
+  });
 }
 
 function toLines(v: unknown): Array<{ label: string; text: string }> {
@@ -251,7 +307,7 @@ export default function BriefView({
   for (const b of TOPIC_BLOCKS) {
     const items = topics
       .filter((t) => t.kind === b.kind)
-      .map((t) => ({ ...t, lines: toLines(t.lines) }))
+      .map((t) => ({ ...t, lines: toLines(t.lines), sources: toSources(t.sources) }))
       .filter((t) => t.lines.length);
     if (!items.length) continue;
     blocks.push({
@@ -266,6 +322,7 @@ export default function BriefView({
               title={t.title}
               impact={t.impact}
               lines={t.lines}
+              sources={t.sources}
             />
           ))}
         </>
@@ -300,6 +357,20 @@ export default function BriefView({
           }}
         />
       ),
+    });
+  }
+
+  /*
+   * 회차 전체 출처. 원고 말미 `## 출처(주요)` 목록이다.
+   * 카드별 링크가 붙기 시작한 건 2026-09-18 회차부터라, 그 전 회차는 여기만 채워진다.
+   */
+  const briefSources = toSources(brief.sources);
+  if (briefSources.length) {
+    blocks.push({
+      id: "sources",
+      label: "출처",
+      note: "원문 기사로 이동합니다",
+      node: <SourceList links={briefSources} label="" />,
     });
   }
 

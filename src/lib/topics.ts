@@ -17,6 +17,7 @@
 
 import { scan } from "./guard";
 import { cleanHeading, dedot, type Section } from "./markdown";
+import { cardSources, type SourceLink } from "./sources";
 
 export type TopicKind = "news" | "theme" | "sector";
 
@@ -32,6 +33,8 @@ export interface Topic {
   /** 영향도 등급. 뉴스에만 있고 나머지는 빈 문자열 */
   impact: string;
   lines: TopicLine[];
+  /** 그 카드가 인용한 기사 링크. 없는 회차가 많다 (sources.ts 주석 참고) */
+  sources: SourceLink[];
 }
 
 export interface DroppedTopic {
@@ -223,6 +226,7 @@ function collect(
       title,
       impact: spec.impact ? impactLevel(field(b.body, spec.impact)) : "",
       lines: values.filter((v) => v.text && !dirty(v.text)),
+      sources: cardSources(b.body),
     });
   }
   return out;

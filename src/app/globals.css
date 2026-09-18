@@ -558,6 +558,37 @@ a:hover {
   white-space: nowrap;
 }
 
+/*
+ * 기사 링크.
+ *
+ * 매체명만 칩으로 늘어놓는다. 제목을 쓰면 줄이 길어지기도 하지만, 무엇보다
+ * 기사 제목에는 종목명이 흔해서 화면에 올릴 수 없다.
+ */
+.topic-sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin: 10px 0 0;
+}
+
+.source-chip {
+  display: inline-block;
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.source-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* ---------- 산문 ---------- */
 
 .prose {
