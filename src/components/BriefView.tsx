@@ -174,7 +174,9 @@ function TopicCard({
         <span className="topic-no">{String(ord).padStart(2, "0")}</span>
         {impact ? <ImpactMeter level={impact} /> : null}
       </div>
-      <h3 className="topic-title">{renderText(title)}</h3>
+      {/* 원고가 카드 제목을 `[…]`로 감싸는 회차가 있다. 화면에서는 대괄호를 벗긴다
+          (`notify.ts`의 `cardTitle`과 같은 처리). DB 값은 원본 그대로 둔다. */}
+      <h3 className="topic-title">{renderText(title.replace(/^\[(.*)\]$/s, "$1").trim())}</h3>
       {lines.map((l) => (
         <p className="topic-line" key={l.label}>
           <span className="topic-label">{l.label}</span>
