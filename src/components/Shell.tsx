@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { NAV } from "../lib/nav";
+import { CONTACT_EMAIL } from "../lib/site";
 
 /**
  * 고시표 셸. 좌측 목차 거터(있을 때만) + 본문 열, 본문 열 끝에 푸터.
@@ -35,6 +36,9 @@ function SiteFooter() {
               {n.label}
             </Link>
           ))}
+          <a href="/rss.xml">RSS</a>
+          {/* 주소를 설정하지 않으면 아무것도 그리지 않는다 (site.ts 주석 참고). */}
+          {CONTACT_EMAIL ? <a href={`mailto:${CONTACT_EMAIL}`}>문의</a> : null}
         </nav>
       </div>
       <p className="footer-note">
