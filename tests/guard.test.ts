@@ -122,6 +122,7 @@ test("레지스트리에 없는 라벨은 거부한다", () => {
     session: "pm" as const,
     runId: "run-1",
     writtenAt: null,
+    sources: [],
     headline: "",
     summary: "",
     macroCommentary: "",

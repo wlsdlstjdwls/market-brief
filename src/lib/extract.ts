@@ -19,8 +19,10 @@ import {
 import { INDICES, MACROS, SECTORS } from "./registry";
 import { cleanHeadline } from "./headline";
 import { extractTopics, type DroppedTopic, type Topic } from "./topics";
+import { listSources, SOURCE_HEADING, type SourceLink } from "./sources";
 
 export type { Topic, TopicLine } from "./topics";
+export type { SourceLink } from "./sources";
 
 export const SOURCE_ALLOW = ["시황.md", "일일리포트.md", "섹터분석.md"] as const;
 export const SOURCE_DENY = ["종목뉴스.md"] as const;
@@ -57,6 +59,8 @@ export interface BriefPayload {
   marketSummary: string;
   /** 뉴스 분석 카드 (섹션 1 Executive Summary + 섹션 5 핵심 테마) */
   topics: Topic[];
+  /** 회차 전체 출처. 원고 말미의 `## 출처(주요)` 목록에서 온다 */
+  sources: SourceLink[];
   indices: Array<{ indexCode: string; indexName: string; close: number | null; changePct: number | null; sortOrder: number }>;
   macros: Array<{ kind: "rate" | "fx" | "oil" | "commodity" | "volatility"; name: string; value: number | null; unit: string; changePct: number | null; sortOrder: number }>;
   flows: Array<{ market: string; investor: "foreign" | "institution" | "retail"; netAmount: number | null }>;
@@ -101,8 +105,17 @@ function cleanParagraphs(s: Section, dropped: DroppedBlock[]): string[] {
   return kept;
 }
 
+/**
+ * 섹션 분류.
+ *
+ * `path[0]`(문서 제목)은 보지 않는다. 시황.md의 제목이
+ * `2026-09-18 시황 분석 (미국 증시 / 한국 증시 영향 / 거시·정책·산업 뉴스)`라서,
+ * 제목까지 세면 그 파일의 **모든** 섹션이 국내·해외 양쪽 정규식에 다 걸렸다.
+ * 그래서 미국 증시 마감 분석이 "국내 시장"에도 통째로 실렸다(2026-09-18 아침판).
+ * 분류 근거는 그 섹션 자신의 헤딩과 상위 섹션 헤딩뿐이다.
+ */
 function pickSections(all: Section[], re: RegExp): Section[] {
-  return all.filter((s) => s.path.some((h) => re.test(h)));
+  return all.filter((s) => s.path.slice(1).some((h) => re.test(h)));
 }
 
 /**
@@ -233,6 +246,18 @@ export function buildPayload(
    * 예전에는 "코스피 6,954.52 (-0.58%)"처럼 지수 종가를 썼는데, 이 사이트가 읽히는 이유가
    * 지수 숫자가 아니라 뉴스라서 바꿨다(사용자 지시). 뉴스가 한 장도 없는 회차만 날짜로 떨어진다.
    */
+  /*
+   * 회차 전체 출처. 원고 말미 `## 출처(주요)` 목록이다.
+   * 카드별 링크(2026-09-18 회차부터)와 겹칠 수 있지만, 카드가 종목 때문에 버려져도
+   * 기사 자체는 남기는 편이 독자에게 낫다.
+   */
+  const briefSources = listSources(
+    all
+      .filter((s) => SOURCE_HEADING.test(cleanHeading(s.heading)))
+      .map((s) => s.body)
+      .join("\n"),
+  );
+
   const lead = topics.find((t) => t.kind === "news") ?? topics[0];
   const headline = lead ? cleanHeadline(lead.title) : `${tradeDate} 브리핑`;
   const leadText = lead?.lines[0]?.text ?? "";
@@ -249,6 +274,7 @@ export function buildPayload(
     macroCommentary: macroParas.join("\n\n"),
     marketSummary: krParas.join("\n\n"),
     topics,
+    sources: briefSources,
     indices,
     macros: mapMacros(market),
     flows: mapFlows(market),
