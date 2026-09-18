@@ -719,12 +719,14 @@ vercel deploy --prod
   구글은 DNS TXT로도 되지만 **네이버는 메타태그나 파일만 받는다.** 값을 넣었으면
   `vercel deploy --prod`를 해야 뜬다(빌드 시점 값)
 - 공유 카드, 파비콘, robots, sitemap, RSS, 404, Analytics 전부 라이브 (위 "론칭 준비" 절)
-- **관리자 콘솔 `/admin` 작업 완료, 아직 배포 안 함** (위 "관리자 콘솔" 절). 배포 전에
-  `ADMIN_EMAIL`·`ADMIN_PASSWORD_HASH`를 Production에 넣어야 한다 — 없으면 `/admin`이 404다
+- **관리자 콘솔 `/admin` 배포됨** (2026-09-18, 커밋 `414ceaa`). `ADMIN_EMAIL`·
+  `ADMIN_PASSWORD_HASH`를 Production에 넣었다 — 이 둘이 없으면 `/admin`은 404다.
+  **비밀번호가 짧다**(사용자 지시). 공개 트래픽이 붙기 전에 긴 값으로 갈아 끼운다
 - **`page_view` 표 생성 완료** (2026-09-18). 방문 집계는 `ANALYTICS_START`(=처리방침 시행일)
   2026-09-18부터 적기 시작한다. `/privacy`도 같은 날 다시 세웠다
-- **회차 탭 지연 수정 완료, 아직 배포 안 함** (위 "회차 탭이 느렸던 이유" 절).
-  `vercel.json`에 `regions: ["sin1"]`을 더했으므로 **`vercel deploy --prod`를 해야 리전이 바뀐다**
+- **회차 탭 지연 수정 배포됨** (위 "회차 탭이 느렸던 이유" 절). 라이브 확인 —
+  `Cache-Control`이 `no-store`에서 `public`으로 바뀌었고 `X-Vercel-Cache`가 `PRERENDER`/`HIT`,
+  `X-Vercel-Id`에 함수 리전이 안 찍힌다(엣지가 그대로 내준다). TTFB 800ms → **45~65ms**
 - 브랜드 마크 한 벌(헤더 로고, favicon.ico, apple-icon, manifest, theme-color) **작업 완료,
   아직 배포 안 함** — `vercel deploy --prod` 필요 (위 "브랜드 마크와 앱 아이콘" 절)
 - `NEXT_PUBLIC_CONTACT_EMAIL` **채움** (2026-09-18). 값은 운영자 개인 메일이고 Production에만
@@ -744,6 +746,32 @@ curl -H "Authorization: Bearer $CRON_SECRET"   "https://thebriefing.kr/api/cron/
 돌아오는 모양은 셋뿐이다.
 `{"skipped":"already-published"}` (러너를 안 깨움) · `{"dispatched":"daily-update.yml"}` (GitHub 런 생성) ·
 헤더 없으면 `401`. `?date=YYYY-MM-DD`로 날짜도 지정할 수 있다.
+
+### 배포 이력 (2026-09-18 2차)
+
+`vercel deploy --prod` 1회. 자동 배포는 계속 꺼져 있다.
+
+| 커밋 | 내용 |
+|---|---|
+| `414ceaa` | 관리자 콘솔 `/admin` 4화면 + `page_view` 방문·유입 집계 + `/privacy` 재수립 + 회차 탭 지연 수정 |
+
+Production 환경변수에 `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH`를 더했다.
+
+검증: `npm test` 44건 · `npm run typecheck` · `npm run build` 통과.
+
+라이브 확인 — `/` `/archive` `/privacy` `/robots.txt` `/sitemap.xml` `/rss.xml` `/admin` 전부 200
+(`/admin`은 로그인 칸), `POST /api/track` 204이고 실제로 한 줄이 들어갔다(확인 후 지웠다).
+`robots.txt`에 `Disallow: /admin`. 날짜 페이지 HTML에 두 회차와 `data-session` 스크립트,
+`id="am-news"` 접두어가 다 들어 있다.
+
+**회차 탭 지연이 실제로 사라졌다.**
+
+| | 고치기 전 | 고친 뒤 |
+|---|---|---|
+| `Cache-Control` | `private, no-cache, no-store` | `public, max-age=0, must-revalidate` |
+| `X-Vercel-Cache` | 늘 `MISS` | `PRERENDER` / `HIT` |
+| `X-Vercel-Id` | `icn1::iad1` (함수가 미국에서 돌았다) | `icn1` (엣지가 그대로 내준다) |
+| TTFB | 740~820ms | **45~65ms** |
 
 ### 배포 이력 (2026-09-18)
 
