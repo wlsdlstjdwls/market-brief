@@ -548,7 +548,12 @@ vercel deploy --prod
   워드마크, `Shell.tsx` 푸터 마크, `scripts/make-og.mjs` 후 og 카드 재생성).
   **`NEXT_PUBLIC_SITE_URL`은 Production 환경변수로 넣었다** — `site.ts`의 기본값도 같이
   바꿨지만 환경변수가 먼저 읽힌다. **빌드 시점 값이라 배포하지 않으면 안 바뀐다**
-- 텔레그램 채널 `t.me/thebriefing_kr` 라이브, secret 등록 완료
+- 텔레그램 채널 `t.me/thebriefing_kr` 라이브, secret 등록 완료. 실제 발송 1건 확인
+  (2026-09-18 am을 `--force`로 한 번 쏴 봤다)
+- **검색엔진 소유 확인은 환경변수 자리만 파 뒀다.** `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION`,
+  `NEXT_PUBLIC_NAVER_SITE_VERIFICATION`. 값이 없으면 메타태그를 그리지 않는다.
+  구글은 DNS TXT로도 되지만 **네이버는 메타태그나 파일만 받는다.** 값을 넣었으면
+  `vercel deploy --prod`를 해야 뜬다(빌드 시점 값)
 - 공유 카드, 파비콘, robots, sitemap, RSS, 404, Analytics 전부 라이브 (위 "론칭 준비" 절)
 - 브랜드 마크 한 벌(헤더 로고, favicon.ico, apple-icon, manifest, theme-color) **작업 완료,
   아직 배포 안 함** — `vercel deploy --prod` 필요 (위 "브랜드 마크와 앱 아이콘" 절)

@@ -5,7 +5,14 @@ import { Noto_Sans_KR } from "next/font/google";
 import Link from "next/link";
 import TopNav from "../components/TopNav";
 import { NAV } from "../lib/nav";
-import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from "../lib/site";
+import {
+  GOOGLE_VERIFICATION,
+  NAVER_VERIFICATION,
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_TITLE,
+  SITE_URL,
+} from "../lib/site";
 import "./globals.css";
 
 const sans = Noto_Sans_KR({
@@ -39,6 +46,13 @@ export const metadata: Metadata = {
   },
   twitter: { card: "summary_large_image", title: SITE_TITLE, description: SITE_DESCRIPTION },
   robots: { index: true, follow: true },
+  /* 값이 없으면 태그를 그리지 않는다 (site.ts 주석 참고). 네이버는 메타태그만 받는다. */
+  verification: {
+    ...(GOOGLE_VERIFICATION ? { google: GOOGLE_VERIFICATION } : {}),
+    ...(NAVER_VERIFICATION
+      ? { other: { "naver-site-verification": NAVER_VERIFICATION } }
+      : {}),
+  },
 };
 
 /*

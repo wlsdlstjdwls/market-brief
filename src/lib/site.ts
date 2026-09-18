@@ -35,6 +35,21 @@ export const SITE_DESCRIPTION =
 export const TELEGRAM_URL = "https://t.me/thebriefing_kr";
 
 /**
+ * 검색엔진 소유 확인 코드. **값이 없으면 메타태그를 아예 그리지 않는다.**
+ *
+ * 구글은 DNS TXT로도 확인되지만 **네이버 서치어드바이저는 HTML 메타태그나 파일만 받는다.**
+ * 그래서 값을 코드에 박지 않고 환경변수로 받는 자리를 만들어 뒀다.
+ *
+ *   vercel env add NEXT_PUBLIC_NAVER_SITE_VERIFICATION production
+ *   vercel deploy --prod
+ *
+ * `NEXT_PUBLIC_` 값은 빌드 시점에 번들로 박힌다 — 넣기만 하고 배포하지 않으면 안 뜬다.
+ * 확인이 끝난 뒤에도 태그는 남겨 둔다. 지우면 소유 확인이 풀린다.
+ */
+export const GOOGLE_VERIFICATION = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ?? "";
+export const NAVER_VERIFICATION = process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION ?? "";
+
+/**
  * 문의 주소. **설정하지 않으면 화면에 아무것도 그리지 않는다.**
  *
  * 개인 메일 주소를 공개 사이트에 박는 건 되돌리기 어려운 결정이라 코드에 넣지 않았다.
