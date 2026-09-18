@@ -116,6 +116,44 @@ a:hover {
   font-weight: 500;
 }
 
+/* 텔레그램 버튼. 헤더 오른쪽 끝. 좁은 화면에서는 아래 줄로 내려앉되 사라지지 않는다. */
+.topbar-cta {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 5px 11px 6px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  align-self: center;
+}
+
+.topbar-cta:hover {
+  background: #1d4ed8;
+  color: #fff;
+}
+
+/* 360px 안팎에서 워드마크 + 네비 + 버튼이 한 줄에 다 들어가지 않는다.
+   가로 간격을 좁혀 두 줄까지만 쓰게 한다. */
+@media (max-width: 480px) {
+  .topbar-inner {
+    gap: 7px 14px;
+    padding: 10px 16px;
+  }
+
+  .topnav {
+    gap: 14px;
+  }
+
+  .topbar-cta {
+    padding: 5px 9px 6px;
+    font-size: 11.5px;
+  }
+}
+
 .topbar-note {
   margin-left: auto;
   font-size: 11.5px;

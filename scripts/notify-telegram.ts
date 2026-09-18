@@ -6,11 +6,11 @@
  *
  * 설계 원칙 셋.
  *
- * 1. **본문을 싣지 않는다.** 헤드라인, 한 줄 요약, 링크까지다.
- *    종목 차단의 마지막 방어선이 렌더 단계(`renderMarkdown`)인데 텔레그램은 그 경로를
- *    타지 않는다. 본문을 통째로 보내면 방어선 하나가 빠진 채 나간다. RSS와 같은 판단이고,
- *    같은 이유로 보내기 직전에 `scan`을 한 번 더 돌린다.
- *    덤으로 독자가 사이트로 들어오게 되어 광고 노출도 지킨다.
+ * 1. **본문을 통째로 보낸다** (2026-09-18 사용자 지시). 카드 전부와 국내/해외 산문까지
+ *    싣고 4096자 한도에 맞춰 여러 통으로 쪼갠다. 이 경로는 렌더 단계(`renderMarkdown`)를
+ *    타지 않으므로 **보내기 직전의 `violations()`가 종목 차단의 유일한 방어선이다.**
+ *    한 건이라도 걸리면 그 회차는 통째로 발송하지 않는다.
+ *    RSS는 여전히 요약만 싣는다 — 그쪽은 기계가 읽는 피드라 판단이 다르다.
  *
  * 2. **한 회차는 한 번만 나간다.** `daily_brief.notified_at`이 근거다. 회차마다 슬롯이
  *    여섯 번 돌고 손으로 재적재하는 일도 있는데 채널에 나간 글은 지워도 이미 읽힌다.
@@ -37,6 +37,7 @@ function arg(name: string): string | undefined {
 }
 const has = (name: string) => process.argv.includes(`--${name}`);
 
+
 const dryRun = has("dry-run");
 const force = has("force");
 const date = arg("date") ?? todayKst();
@@ -52,7 +53,7 @@ function todayKst(): string {
   }).format(new Date());
 }
 
-async function send(text: string): Promise<void> {
+async function send(text: string, preview: boolean): Promise<void> {
   const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -61,8 +62,8 @@ async function send(text: string): Promise<void> {
       text,
       // HTML 모드. 이스케이프할 글자가 &, <, > 셋뿐이라 사고가 나지 않는다 (notify.ts의 esc).
       parse_mode: "HTML",
-      // 링크 미리보기는 켜 둔다. og:image 카드가 채널에서 그대로 뜬다.
-      disable_web_page_preview: false,
+      // 미리보기는 링크가 든 마지막 통에서만 켠다. 앞 통에 켜면 빈 카드가 붙는다.
+      disable_web_page_preview: !preview,
     }),
   });
   const body = (await res.json()) as { ok?: boolean; description?: string };
@@ -88,6 +89,8 @@ async function main() {
       session: dailyBrief.session,
       headline: dailyBrief.headline,
       summary: dailyBrief.summary,
+      marketSummary: dailyBrief.marketSummary,
+      macroCommentary: dailyBrief.macroCommentary,
       publishedAt: dailyBrief.publishedAt,
     })
     .from(dailyBrief)
@@ -110,15 +113,27 @@ async function main() {
       continue;
     }
 
-    // 그날 다룬 카드 제목 몇 줄. 적재 때 이미 걸러진 값이지만 prose에 실려 한 번 더 검사된다.
+    // 그날 카드 전부. 적재 때 이미 걸러진 값이지만 prose에 실려 한 번 더 검사된다.
     const topics = await db
-      .select({ title: briefTopic.title })
+      .select({
+        kind: briefTopic.kind,
+        title: briefTopic.title,
+        impact: briefTopic.impact,
+        lines: briefTopic.lines,
+      })
       .from(briefTopic)
       .where(eq(briefTopic.briefId, b.id))
-      .orderBy(briefTopic.kind, briefTopic.rank)
-      .limit(3);
+      .orderBy(briefTopic.kind, briefTopic.rank);
 
-    const { text, prose } = compose(b, topics.map((t) => t.title));
+    const { chunks, prose } = compose(
+      b,
+      topics.map((t) => ({
+        kind: t.kind,
+        title: t.title,
+        impact: t.impact,
+        lines: Array.isArray(t.lines) ? (t.lines as Array<{ label?: string; text?: string }>) : [],
+      })),
+    );
     const bad = violations(prose);
     if (bad.length) {
       console.error(`✗ ${label} 발송 중단 — 종목 표기 ${bad.length}건`);
@@ -128,13 +143,18 @@ async function main() {
     }
 
     if (dryRun) {
-      console.log(`--- ${label} (dry-run)\n${text}\n`);
+      const total = chunks.join("").length;
+      console.log(`--- ${label} (dry-run, ${chunks.length}통 ${total}자)`);
+      console.log(`${chunks.join("\n\n=== 다음 통 ===\n\n")}\n`);
       continue;
     }
 
-    await send(text);
+    // 미리보기는 링크가 든 마지막 통에서만 켠다.
+    for (const [i, chunk] of chunks.entries()) {
+      await send(chunk, i === chunks.length - 1);
+    }
     await db.update(dailyBrief).set({ notifiedAt: new Date() }).where(eq(dailyBrief.id, b.id));
-    console.log(`✓ ${label} 발송 완료`);
+    console.log(`✓ ${label} 발송 완료 (${chunks.length}통)`);
     sent += 1;
   }
 

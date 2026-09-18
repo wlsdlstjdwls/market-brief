@@ -4,18 +4,41 @@
  * CLI(`scripts/notify-telegram.ts`)에서 떼어 둔 이유는 회귀 테스트 때문이다.
  * 여기 규칙들은 전부 실수로 되돌리기 쉬운 것이라 테스트로 못 박아 둔다
  * (`tests/notify.test.ts`).
+ *
+ * **본문을 통째로 싣는다** (2026-09-18 사용자 지시). 처음에는 헤드라인과 링크만 보냈는데
+ * "내용이 너무 적다"는 지적을 받았다. 그 대신 **보내는 글 전체가 `violations()`를 지난다** —
+ * 렌더 단계(`renderMarkdown`)를 안 타는 경로라 여기서 한 번 더 보는 것이 유일한 방어선이다.
+ * 한 건이라도 걸리면 그 회차는 통째로 발송하지 않는다.
  */
 import { scan } from "./guard";
 import { isRegistryName } from "./registry";
 import { SESSION_LABEL, type Session } from "./queries";
 import { SITE_NAME, SITE_URL } from "./site";
 
+/** 텔레그램 한 통의 상한은 4096자다. 서식 태그까지 세므로 여유를 둔다. */
+const CHUNK = 3500;
+
+export interface NotifyTopic {
+  kind: string;
+  title: string;
+  impact?: string;
+  lines: Array<{ label?: string; text?: string }>;
+}
+
 export interface NotifyBrief {
   tradeDate: string;
   session: Session;
   headline: string;
   summary: string;
+  marketSummary?: string;
+  macroCommentary?: string;
 }
+
+const KIND_LABEL: Record<string, string> = {
+  news: "뉴스 분석",
+  theme: "핵심 테마",
+  sector: "업종 관점",
+};
 
 /**
  * 텔레그램 HTML 모드에서 뜻을 갖는 세 글자만 막는다.
@@ -31,68 +54,155 @@ function esc(s: string): string {
 
 /** 2026-09-18 → 2026.09.18 (금). 서버가 UTC로 돌기 때문에 시간대를 박아 둔다. */
 function dateLine(iso: string): string {
-  const d = new Date(`${iso}T00:00:00+09:00`);
   const wd = new Intl.DateTimeFormat("ko-KR", {
     timeZone: "Asia/Seoul",
     weekday: "short",
-  }).format(d);
+  }).format(new Date(`${iso}T00:00:00+09:00`));
   return `${iso.replace(/-/g, ".")} (${wd})`;
 }
 
 /**
- * 요약을 문장 경계에서 자른다. 알림은 미끼지 본문이 아니다 — 채널에서 다 읽히면
- * 사이트로 올 이유가 없어진다. `BriefView`의 `lead()`와 같은 판단이다.
+ * 저장된 마크다운을 텔레그램용 평문으로 바꾼다.
+ *
+ * 화면은 `renderMarkdown`이 HTML로 바꾸지만 여기서는 서식이 거의 필요 없다.
+ * 링크는 **표시 문자열만 남긴다** — 기사 URL을 그대로 실으면 글이 링크 더미가 되고,
+ * 채널에서 미리보기가 엉뚱한 기사로 잡힌다.
  */
-export function clip(text: string, max = 180): string {
-  if (text.length <= max) return text;
-  const head = text.slice(0, max);
-  const cut = Math.max(head.lastIndexOf(". "), head.lastIndexOf("다. "), head.lastIndexOf("다."));
-  return cut > 40 ? head.slice(0, cut + 2).trim() : `${head.trim()}…`;
+function toPlain(md: string): string {
+  return md
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/^\s*#{1,6}\s*/gm, "")
+    .replace(/^\s*[-*]{3,}\s*$/gm, "")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1$2")
+    .replace(/^\s*>\s?/gm, "")
+    .replace(/^\s*[-*]\s+/gm, "— ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/** 카드 제목. 원고가 `[…]`로 감싸는 회차가 있어 대괄호를 벗긴다. */
+function cardTitle(t: string): string {
+  return t.trim().replace(/^\[(.*)\]$/s, "$1").trim();
 }
 
 /**
- * 보낼 문구와, 그중 검사할 부분.
- *
- * **본문은 싣지 않는다.** 헤드라인, 잘라낸 요약, 그날 다룬 카드 제목 몇 줄, 링크까지다.
- * 종목 차단의 마지막 방어선이 렌더 단계(`renderMarkdown`)인데 텔레그램은 그 경로를
- * 타지 않는다. 카드 제목을 싣는 건 무엇을 다뤘는지 보여 주려는 것이고, 본문(무슨 일인가,
- * 왜 중요한가)은 사이트에만 있다.
+ * 보낼 문구(여러 통으로 쪼갠 것)와, 그중 검사할 부분.
  *
  * **가운뎃점(·)을 쓰지 않는다.** 화면 문구와 같은 규칙이다(`dedot` 참고).
  */
 export function compose(
   b: NotifyBrief,
-  topics: string[] = [],
-): { text: string; prose: string; url: string } {
+  topics: NotifyTopic[] = [],
+): { chunks: string[]; prose: string; url: string } {
   const url = `${SITE_URL}/brief/${b.tradeDate}${b.session === "am" ? "?s=am" : ""}`;
   const headline = b.headline.trim();
-  const summary = clip(b.summary.trim());
-  // 원고가 카드 제목을 `[…]`로 감싸는 회차가 있다. 대괄호는 벗기고 싣는다.
-  // 첫 카드는 헤드라인과 같은 글인 경우가 많아(헤드라인이 첫 카드에서 나온다) 걸러낸다.
-  const picked = topics
-    .map((t) => t.trim().replace(/^\[(.*)\]$/s, "$1").trim())
-    .filter((t) => t && t !== headline)
-    .slice(0, 3);
+  const summary = b.summary.trim();
 
-  const lines = [
-    `<b>${esc(SITE_NAME)}</b>  ${esc(SESSION_LABEL[b.session])}`,
-    dateLine(b.tradeDate),
-    "",
-    `<b>${esc(headline)}</b>`,
-  ];
+  /** 서식을 입힌 문단들과, 검사에 넣을 맨 문장들을 나란히 쌓는다. */
+  const blocks: string[] = [];
+  const plain: string[] = [headline, summary];
 
-  if (summary && summary !== headline) lines.push("", esc(summary));
+  blocks.push(`<b>${esc(SITE_NAME)}</b>  ${esc(SESSION_LABEL[b.session])}\n${dateLine(b.tradeDate)}`);
+  blocks.push(`<b>${esc(headline)}</b>`);
+  if (summary && summary !== headline) blocks.push(esc(summary));
 
-  if (picked.length) {
-    lines.push("", "<b>오늘 다룬 이야기</b>");
-    for (const t of picked) lines.push(`— ${esc(t)}`);
+  /**
+   * 같은 카드가 두 번 실리는 걸 막는다. 원고에 같은 업종이 두 번 적히는 회차가 있고
+   * (2026-09-18 pm의 반도체), 헤드라인은 원래 첫 뉴스 카드에서 뽑은 것이라 늘 겹친다.
+   * 머리에서 이미 읽은 문장을 카드에서 또 읽게 두면 글이 길기만 해진다.
+   */
+  const seen = new Set<string>();
+  let lastKind = "";
+
+  for (const t of topics) {
+    const title = cardTitle(t.title);
+    if (!title) continue;
+
+    const key = `${title}\n${(t.lines ?? []).map((l) => l?.text ?? "").join("\n")}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    // 머리에 이미 실은 요약과 같은 줄은 뺀다.
+    const rows = (t.lines ?? [])
+      .map((l) => ({ label: (l?.label ?? "").trim(), text: (l?.text ?? "").trim() }))
+      .filter((l) => l.text && l.text !== summary);
+
+    // 제목도 본문도 머리와 같은 카드면 통째로 버린다(헤드라인이 나온 그 카드다).
+    if (!rows.length && title === headline) continue;
+
+    // 묶음 제목은 실제로 실을 카드가 정해진 뒤에 붙인다. 먼저 붙이면 그 묶음의
+    // 카드가 전부 걸러진 회차에서 제목만 덩그러니 남는다.
+    if (t.kind !== lastKind) {
+      blocks.push(`<b>${esc(KIND_LABEL[t.kind] ?? t.kind)}</b>`);
+      lastKind = t.kind;
+    }
+
+    const impact = (t.impact ?? "").trim();
+    const body = [`<b>${esc(title)}</b>${impact ? ` <i>${esc(impact)}</i>` : ""}`];
+    plain.push(title);
+
+    for (const l of rows) {
+      body.push(l.label ? `${esc(l.label)}  ${esc(l.text)}` : esc(l.text));
+      plain.push(l.text);
+    }
+    blocks.push(body.join("\n"));
   }
 
-  lines.push("", `<a href="${url}">전문 보기</a>`);
+  for (const [label, md] of [
+    ["국내 시장", b.marketSummary],
+    ["해외 시장", b.macroCommentary],
+  ] as const) {
+    const text = toPlain((md ?? "").trim());
+    if (!text) continue;
+    blocks.push(`<b>${esc(label)}</b>`);
+    blocks.push(esc(text));
+    plain.push(text);
+  }
 
-  // 검사 대상은 사람이 쓴 문장뿐이다. 링크와 날짜 줄은 뺀다 (violations 주석 참고).
-  const prose = [headline, summary, ...picked].join("\n");
-  return { text: lines.join("\n"), prose, url };
+  blocks.push(`<a href="${url}">사이트에서 보기</a>`);
+
+  // 검사 대상은 사람이 쓴 문장뿐이다. 링크와 날짜 줄, 서식 태그는 뺀다 (violations 주석 참고).
+  return { chunks: pack(blocks), prose: plain.join("\n"), url };
+}
+
+/**
+ * 문단을 4096자 한도 아래로 묶는다. **문단 경계에서만 자른다** — 글자 수로 자르면
+ * `<b>` 태그가 두 통에 걸쳐 쪼개져 텔레그램이 발송을 거부한다.
+ * 한 문단이 그 자체로 한도를 넘으면 그때만 줄 단위로 나눈다.
+ */
+function pack(blocks: string[]): string[] {
+  const out: string[] = [];
+  let cur = "";
+
+  const push = (piece: string) => {
+    if (!cur) cur = piece;
+    else if (cur.length + piece.length + 2 <= CHUNK) cur += `\n\n${piece}`;
+    else {
+      out.push(cur);
+      cur = piece;
+    }
+  };
+
+  for (const b of blocks) {
+    if (b.length <= CHUNK) {
+      push(b);
+      continue;
+    }
+    let buf = "";
+    for (const line of b.split("\n")) {
+      if (buf.length + line.length + 1 > CHUNK) {
+        push(buf);
+        buf = line;
+      } else buf = buf ? `${buf}\n${line}` : line;
+    }
+    if (buf) push(buf);
+  }
+
+  if (cur) out.push(cur);
+  return out;
 }
 
 /**
@@ -100,7 +210,7 @@ export function compose(
  *
  * **URL은 검사하지 않는다.** KRX에 `TP`라는 종목이 있어서 `https`의 `tp`가 그대로 걸린다
  * (`sources.ts`가 링크를 한글 구간만 검사하는 것과 같은 이유다). 우리가 만드는 주소는
- * `SITE_URL` + 날짜뿐이라 한글이 섞일 자리가 없고, 검사할 값은 헤드라인과 요약, 카드 제목이다.
+ * `SITE_URL` + 날짜뿐이라 한글이 섞일 자리가 없고, 검사할 값은 사람이 쓴 문장 전부다.
  *
  * `review` 등급도 `block`과 똑같이 막는다. 발행 경로 전체가 같은 기준이다.
  */

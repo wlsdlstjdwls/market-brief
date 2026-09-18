@@ -12,6 +12,7 @@ import {
   SITE_NAME,
   SITE_TITLE,
   SITE_URL,
+  TELEGRAM_URL,
 } from "../lib/site";
 import "./globals.css";
 
@@ -94,6 +95,22 @@ function Header() {
           더 브리핑
         </Link>
         <TopNav items={[...NAV]} />
+        {/*
+          텔레그램 버튼. 푸터 위 안내 한 줄만으로는 눈에 안 띈다는 지적을 받아 헤더로 올렸다.
+          `margin-left: auto`로 오른쪽 끝에 붙고, 좁은 화면에서는 `.topbar-inner`가
+          wrap이라 아래 줄로 내려앉는다 — 숨기지 않는다(모바일에서 보여야 한다).
+
+          바탕을 채우고 모서리를 각지게 두는 건 영향도 배지(`매우 큼`)와 같은 처리다.
+          design-spec의 "배경 채움 없음"은 카드와 박스 얘기고, 누르라고 만든 자리는 예외다.
+        */}
+        <a
+          className="topbar-cta"
+          href={TELEGRAM_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          텔레그램으로 받기
+        </a>
       </div>
     </header>
   );
