@@ -82,6 +82,27 @@ a:hover {
   white-space: nowrap;
 }
 
+/*
+ * 도형은 글자 옆에 인라인으로 앉힌다 — 배치 이유는 layout.tsx의 Mark 주석 참고.
+ *
+ * **`display`를 반드시 되돌려야 한다.** Tailwind preflight가
+ * `img, svg, video, canvas, ... { display: block }`을 깔아서, 그냥 두면 마크가
+ * 제 줄을 차지하고 워드마크가 두 줄로 쪼개진다.
+ */
+.wordmark-mark {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-right: 7px;
+}
+
+.wordmark-mark .mark-accent {
+  fill: var(--accent);
+}
+
+.wordmark-mark .mark-ink {
+  fill: currentColor;
+}
+
 .topnav {
   display: flex;
   flex-wrap: wrap;

@@ -42,6 +42,7 @@
 | `scripts/install_update_web_task.bat` | 위 작업을 평일 16:10에 등록 |
 | `scripts/backfill.py` | 과거 회차 일괄 적재 |
 | `scripts/make-og.mjs` | 공유 카드(og:image) PNG를 굽는다. 문구·색을 바꾸면 다시 돌린다 |
+| `scripts/make-icons.mjs` | 파비콘·앱 아이콘을 굽는다. 마크나 색을 바꾸면 다시 돌린다 |
 | `src/app/api/cron/dispatch/route.ts` | Vercel Cron이 때리는 트리거. GitHub 워크플로를 workflow_dispatch로 깨운다 |
 
 배치 파일은 ASCII로만 쓴다. cmd.exe가 한글 배치 텍스트를 깨뜨려 실행 자체가 실패한다
@@ -229,7 +230,9 @@ KRX(data.krx.co.kr)가 이 PC의 IP를 차단한다. 응답이 JSON이 아니라
 |---|---|
 | `src/lib/site.ts` | 절대 URL·사이트 이름·설명·문의 주소. 한 군데서 읽는다 |
 | `src/app/opengraph-image.png` | 공유 카드 1200×630. `scripts/make-og.mjs`가 굽는다 |
-| `src/app/icon.svg` | 파비콘 |
+| `src/app/icon.svg` | 파비콘 (SVG). `scripts/make-icons.mjs`와 같은 도형이다 |
+| `src/app/favicon.ico` · `apple-icon.png` | SVG 폴백, iOS 홈 화면. `make-icons.mjs`가 굽는다 |
+| `src/app/manifest.ts` | 웹 앱 매니페스트. 안드로이드 홈 화면이 읽는다 |
 | `src/app/robots.ts` · `sitemap.ts` | 색인. `/api/*`는 막는다 |
 | `src/app/rss.xml/route.ts` | RSS 2.0 |
 | `src/app/not-found.tsx` · `error.tsx` | 404와 렌더 실패 |
@@ -256,6 +259,36 @@ KRX(data.krx.co.kr)가 이 PC의 IP를 차단한다. 응답이 JSON이 아니라
 - **홈과 `/brief/{최신}`이 같은 내용인 건 그대로 뒀다.** 둘 다 자기 자신을 canonical로
   가리킨다. 홈의 canonical을 날짜 페이지로 돌리면 첫 화면이 색인에서 빠지고, 반대로
   돌리면 아카이브가 빠진다. 뉴스 사이트에서 흔한 형태라 손대지 않았다.
+### 브랜드 마크와 앱 아이콘 (2026-09-18 2차)
+
+파비콘과 공유 카드는 있었지만 **`apple-icon`, `favicon.ico`, `manifest`, `theme-color`,
+헤더 로고가 비어 있었다**(사용자 지적). 다섯을 채웠다. 도형은 한 벌로 통일했다 —
+브리핑 한 편을 세 줄로 줄인 모양이고 머리줄만 브랜드 블루다.
+
+| 자리 | 파일 | 없을 때 증상 |
+|---|---|---|
+| iOS 홈 화면 | `src/app/apple-icon.png` 180 | 아이콘 대신 **페이지 스크린샷**이 박힌다 |
+| 구형 브라우저 탭 | `src/app/favicon.ico` 16+32+48 | SVG 파비콘을 못 읽는 쪽에서 탭이 빈다 |
+| 안드로이드 홈 화면 | `src/app/manifest.ts` + `public/icon-*.png` | 이름이 `<title>` 전체로 들어가고 스플래시가 흰색 |
+| 모바일 크롬 주소창 | `layout.tsx`의 `viewport` | 흰색으로 떨어져 크림 배경과 경계가 생긴다 |
+| 헤더 | `layout.tsx`의 `Mark()` | 사이트 전체에 로고 그래픽이 한 장도 없었다 |
+
+- **`themeColor`는 `metadata`가 아니라 `viewport` export다.** Next 14에서 폐기됐다.
+  `metadata`에 넣으면 조용히 무시된다.
+- **좌표를 전부 4의 배수로 둔다.** 16px 파비콘의 1픽셀이 64단위의 4다. 4로 안 떨어지면
+  막대가 반 픽셀에 걸려 회색으로 뭉갠다 — 처음 판(`y=15/28/41`)의 아래 막대가 그랬다.
+- **모서리를 굴리지 않는다.** `design/design-spec.md`가 "카드, 박스, 둥근 모서리, 배경
+  채움 없음"이다. iOS·안드로이드 런처는 어차피 제 모양대로 깎으므로 각진 판이 손해가 없다.
+- **헤더 마크에 `display: inline-block`을 반드시 준다.** Tailwind preflight가
+  `img, svg, video, ... { display: block }`을 깔아서, 그냥 두면 마크가 제 줄을 차지하고
+  워드마크가 두 줄로 쪼개진다. 실제로 그렇게 났다가 고쳤다.
+- **매니페스트 아이콘은 `public/`에 둔다.** `src/app/`에 두면 Next가 파일 규약으로 집어
+  `<link rel="icon">`이 중복으로 달린다.
+- **`display: "browser"`다.** 읽고 나가는 글이지 앱이 아니다. `standalone`이면 주소창이
+  사라져 기사 링크가 어디로 나가는지 알 수 없고 뒤로 가기도 잃는다. 나가는 링크가
+  본문의 핵심이라(`sources.ts`) 손해가 크다.
+- **OG 카드는 그대로 뒀다.** `make-og.mjs`가 굽는 1200x630은 멀쩡했다.
+
 - **개인정보 처리방침은 아직 필요 없다.** Analytics는 쿠키를 쓰지 않고 개인을 식별하지
   않는다. **이메일을 받는 순간 필수가 된다**(개인정보 보호법 제30조) — 폼·라우트·방침을
   한 커밋에 묶는다.
@@ -473,6 +506,8 @@ vercel deploy --prod
   GitHub `schedule`은 백업 두 줄(11:40·20:40)만 남아 있다
 - 로컬 작업 스케줄러 `MarketBrief-Update`는 **비활성화됨** (중복 실행 방지, 되돌리기는 `/ENABLE`)
 - 공유 카드, 파비콘, robots, sitemap, RSS, 404, Analytics 전부 라이브 (위 "론칭 준비" 절)
+- 브랜드 마크 한 벌(헤더 로고, favicon.ico, apple-icon, manifest, theme-color) **작업 완료,
+  아직 배포 안 함** — `vercel deploy --prod` 필요 (위 "브랜드 마크와 앱 아이콘" 절)
 - `NEXT_PUBLIC_CONTACT_EMAIL` **채움** (2026-09-18). 값은 운영자 개인 메일이고 Production에만
   넣었다. 푸터 문의 링크가 `mailto:`로 그려진다. **`NEXT_PUBLIC_` 값은 클라이언트 번들에
   박히므로 수집 봇에 그대로 노출된다** — 스팸이 성가셔지면 별도 주소로 갈아 끼우고

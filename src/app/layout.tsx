@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Noto_Sans_KR } from "next/font/google";
@@ -41,11 +41,42 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
+/*
+ * 모바일 크롬 주소창 색. 안 넣으면 흰색으로 떨어져 크림 배경과 경계가 생긴다.
+ *
+ * `metadata`의 `themeColor`는 Next 14에서 폐기됐다. 여기 `viewport`가 지금 자리다.
+ * 값은 `globals.css`의 `--bg`와 같아야 하고, 다크 모드가 없으므로(`color-scheme: light`)
+ * 한 값이면 된다.
+ */
+export const viewport: Viewport = {
+  themeColor: "#fbfaf7",
+  colorScheme: "light",
+};
+
+/**
+ * 워드마크 앞의 마크. 브리핑 한 편을 세 줄로 줄인 모양이고 머리줄만 브랜드색이다.
+ * 파비콘·앱 아이콘과 같은 도형이다 (`scripts/make-icons.mjs`).
+ *
+ * 인라인 `svg`로 둔다. `.topbar-inner`가 `align-items: baseline`이라 워드마크를
+ * flex 컨테이너로 바꾸면 기준선이 도형 아래쪽으로 잡혀 옆의 네비와 어긋난다.
+ * 글자가 기준선을 그대로 쥐고 있게 두고 도형만 `vertical-align`으로 앉힌다.
+ */
+function Mark() {
+  return (
+    <svg className="wordmark-mark" viewBox="0 0 18 16" width="15" height="14" aria-hidden="true">
+      <rect className="mark-accent" y="1.5" width="18" height="3.2" />
+      <rect className="mark-ink" y="6.4" width="18" height="3.2" />
+      <rect className="mark-ink" y="11.3" width="11" height="3.2" />
+    </svg>
+  );
+}
+
 function Header() {
   return (
     <header className="topbar">
       <div className="topbar-inner">
         <Link href="/" className="wordmark">
+          <Mark />
           뉴스 브리핑
         </Link>
         <TopNav items={[...NAV]} />
