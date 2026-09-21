@@ -89,6 +89,8 @@ export default async function BriefPage({ params }: Params) {
             brief={it.brief}
             sessions={sessions}
             topics={it.topics}
+            // 두 회차가 이 문서에 다 구워져 있다. 탭이 주소만 바꾸고 CSS가 뒤집는다
+            inlineSessions
             // 두 회차가 한 문서에 있다. 접두어가 없으면 `#news`가 둘이 된다
             idPrefix={it.brief.session === "pm" ? "" : `${it.brief.session}-`}
           />

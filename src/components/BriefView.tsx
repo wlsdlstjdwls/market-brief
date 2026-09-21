@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { renderMarkdown, renderText } from "../lib/render";
+import { weekdayKo } from "../lib/date";
 import { SESSION_LABEL, type Session } from "../lib/queries";
 import SectionRail from "./SectionRail";
 import SessionTabs from "./SessionTabs";
@@ -22,8 +23,13 @@ interface Props {
   };
   /** 그날 발행된 회차. 둘이면 탭이 나온다. 하나면 탭을 그리지 않는다. */
   sessions?: Session[];
-  /** 탭 링크의 뿌리. 홈이면 "/", 날짜 페이지면 "/brief/{날짜}". */
+  /** 탭 링크의 뿌리. 언제나 날짜 페이지(`/brief/{날짜}`)다 — 홈에는 마감판만 구워져 있다. */
   basePath?: string;
+  /**
+   * 이 문서에 두 회차가 둘 다 구워져 있는가. 날짜 페이지만 참이다.
+   * 홈에서 참으로 두면 탭 밑줄만 옮겨 가고 글은 안 바뀐다(2026-09-21에 그랬다).
+   */
+  inlineSessions?: boolean;
   /**
    * 섹션 id 앞에 붙이는 말. 날짜 페이지가 두 회차를 한 문서에 같이 구우므로
    * 접두어가 없으면 `#news`가 양쪽에 생겨 목차 앵커가 숨은 쪽으로 튄다.
@@ -38,13 +44,6 @@ interface Props {
     sources?: unknown;
   }>;
   recent?: Array<{ tradeDate: string; headline: string }>;
-}
-
-const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
-
-function weekday(date: string) {
-  const d = new Date(`${date}T00:00:00+09:00`);
-  return Number.isNaN(d.getTime()) ? null : WEEKDAY[d.getDay()];
 }
 
 /*
@@ -269,6 +268,7 @@ export default function BriefView({
   brief,
   sessions = [],
   basePath = `/brief/${brief.tradeDate}`,
+  inlineSessions = false,
   idPrefix = "",
   topics = [],
   recent = [],
@@ -359,7 +359,7 @@ export default function BriefView({
       node: (
         <>
           {recent.map((b) => {
-            const d = weekday(b.tradeDate);
+            const d = weekdayKo(b.tradeDate);
             return (
               <Link
                 key={b.tradeDate}
@@ -379,7 +379,7 @@ export default function BriefView({
     });
   }
 
-  const day = weekday(brief.tradeDate);
+  const day = weekdayKo(brief.tradeDate);
   const posted = postedLabel(brief.publishedAt, brief.tradeDate);
 
   return (
@@ -398,7 +398,7 @@ export default function BriefView({
         </div>
 
         {/* 켜진 탭은 `<html data-session>`을 보고 CSS가 고른다. SessionTabs 주석 참고 */}
-        <SessionTabs basePath={basePath} sessions={sessions} />
+        <SessionTabs basePath={basePath} sessions={sessions} inline={inlineSessions} />
 
         {/* 회차와 게시 시각만 찍는다. 원고 작성 시각은 사용자 지시로 뺐다(2026-09-17).
             값은 daily_brief.written_at에 계속 쌓이므로 되살리려면 여기만 되돌리면 된다. */}

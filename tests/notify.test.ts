@@ -97,3 +97,27 @@ test("태그가 통 경계에서 쪼개지지 않는다", () => {
     assert.equal(open, close, "굵게 태그가 한 통 안에서 닫힌다");
   }
 });
+
+/*
+ * 2026-09-21 사용자 지적 — 제목 뒤에 `큼`이 그대로 붙어 제목의 끝말처럼 읽혔고,
+ * 항목 이름이 맨 글자라 본문과 구분되지 않았다.
+ */
+test("영향도는 제목과 다른 줄에, 무엇이 큰지를 밝혀 적는다", () => {
+  const { chunks } = compose(base, [
+    { kind: "news", title: "FOMC 앞두고 관망", impact: "큼", lines: [{ label: "무슨 일인가", text: "관망세가 짙어졌다" }] },
+  ]);
+  const body = whole(chunks);
+  assert.ok(body.includes("<b>FOMC 앞두고 관망</b>\n<i>시장 영향 큼</i>"), body);
+  assert.ok(!body.includes("관망</b> <i>"), "제목 줄에 이어 붙이지 않는다");
+});
+
+test("이미 '시장 영향'으로 시작하면 두 번 붙이지 않는다", () => {
+  const { chunks } = compose(base, [card("반도체 수출 증가")]);
+  assert.ok(whole(chunks).includes("<i>시장 영향 큼</i>"));
+  assert.ok(!whole(chunks).includes("시장 영향 시장 영향"));
+});
+
+test("항목 이름은 굵게 박아 본문과 가른다", () => {
+  const { chunks } = compose(base, [card("반도체 수출 증가", "수출이 늘었다")]);
+  assert.ok(whole(chunks).includes("<b>무슨 일인가</b>  수출이 늘었다"));
+});

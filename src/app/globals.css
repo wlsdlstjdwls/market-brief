@@ -813,7 +813,9 @@ html:not([data-session="am"]) .ses--am {
   justify-content: space-between;
   gap: 6px 20px;
   margin-top: clamp(32px, 5vw, 56px);
-  padding-top: 16px;
+  /* 아래쪽 여백을 반드시 준다. 안 주면 링크의 밑줄이 푸터 위 헤어라인에 붙어
+     두 줄이 겹쳐 보인다(2026-09-21 사용자 지적). */
+  padding: 16px 0 18px;
   border-top: 1px solid var(--line);
 }
 
@@ -823,12 +825,16 @@ html:not([data-session="am"]) .ses--am {
   color: var(--muted);
 }
 
+/* `inline-block`이라야 밑줄이 줄 높이 안에 들어온다. 그냥 inline이면 테두리가
+   줄 상자 밖으로 삐져나가 좁은 화면에서 아랫줄과 겹친다. */
 .tg-cta-link {
+  display: inline-block;
   font-size: 13.5px;
   font-weight: 600;
+  line-height: 1.5;
   color: var(--accent);
   border-bottom: 1px solid currentColor;
-  padding-bottom: 1px;
+  padding-bottom: 2px;
 }
 
 .site-footer {

@@ -2,16 +2,10 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import Shell from "../../components/Shell";
 import { listBriefs } from "../../lib/queries";
+import { weekdayKo } from "../../lib/date";
 
 export const revalidate = 300;
 export const metadata: Metadata = { title: "지난 브리핑" };
-
-const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
-
-function weekday(date: string) {
-  const d = new Date(`${date}T00:00:00+09:00`);
-  return Number.isNaN(d.getTime()) ? null : WEEKDAY[d.getDay()];
-}
 
 export default async function Archive() {
   const briefs = await listBriefs(120);
@@ -42,7 +36,7 @@ export default async function Archive() {
             </div>
             <div className="sec-body">
               {list.map((b) => {
-                const d = weekday(b.tradeDate);
+                const d = weekdayKo(b.tradeDate);
                 return (
                   <Link
                     key={b.tradeDate}

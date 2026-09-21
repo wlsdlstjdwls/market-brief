@@ -89,6 +89,20 @@ function cardTitle(t: string): string {
 }
 
 /**
+ * 영향도 한 줄.
+ *
+ * DB에 담기는 값은 등급뿐이다(`큼`, `매우 큼` …). 그걸 제목 뒤에 그냥 이어 붙였더니
+ * 채널에 `... 추가 인상 확률 58% 반영 큼`으로 나가 **제목의 끝말처럼 읽혔다**
+ * (2026-09-21 사용자 지적). 줄을 따로 잡고 무엇이 큰지를 앞에 붙인다 — 화면의
+ * 영향도 배지(`BriefView`의 `ImpactMeter`)와 같은 문구다.
+ */
+function impactLine(raw?: string): string {
+  const v = (raw ?? "").trim();
+  if (!v) return "";
+  return v.startsWith("시장 영향") ? v : `시장 영향 ${v}`;
+}
+
+/**
  * 보낼 문구(여러 통으로 쪼갠 것)와, 그중 검사할 부분.
  *
  * **가운뎃점(·)을 쓰지 않는다.** 화면 문구와 같은 규칙이다(`dedot` 참고).
@@ -140,12 +154,18 @@ export function compose(
       lastKind = t.kind;
     }
 
-    const impact = (t.impact ?? "").trim();
-    const body = [`<b>${esc(title)}</b>${impact ? ` <i>${esc(impact)}</i>` : ""}`];
+    const impact = impactLine(t.impact);
+    const body = [`<b>${esc(title)}</b>`];
+    if (impact) body.push(`<i>${esc(impact)}</i>`);
     plain.push(title);
 
+    /*
+     * 항목 이름을 굵게 박는다. 맨 글자로 두면 `무슨 일인가 Fed는 ...`처럼 본문에
+     * 파묻혀 어디까지가 소제목인지 안 보인다(2026-09-21 사용자 지적).
+     * 화면에서는 `.topic-label`이 색과 굵기로 하는 일을 여기서는 `<b>`가 한다.
+     */
     for (const l of rows) {
-      body.push(l.label ? `${esc(l.label)}  ${esc(l.text)}` : esc(l.text));
+      body.push(l.label ? `<b>${esc(l.label)}</b>  ${esc(l.text)}` : esc(l.text));
       plain.push(l.text);
     }
     blocks.push(body.join("\n"));
