@@ -58,18 +58,6 @@ jobs:
       - name: 본체 체크아웃
         uses: actions/checkout@v4
 
-      # PAT 대신 read-only deploy key를 쓴다. 이 저장소에만 붙고, 쓰기가 아예 안 되고,
-      # 사람 계정 권한과 무관하게 해지된다(stock-analysis → Settings → Deploy keys).
-      - name: 원고 체크아웃 (stock-analysis, 읽기 전용)
-        uses: actions/checkout@v4
-        with:
-          repository: wlsdlstjdwls/stock-analysis
-          ssh-key: ${{ secrets.REPORTS_SSH_KEY }}
-          path: reports
-          # 원고만 받는다. 백테스트 산출물까지 받으면 느려진다.
-          sparse-checkout: 요약/뉴스
-          sparse-checkout-cone-mode: false
-
       - name: 대상 일자·회차 결정
         id: date
         env:
@@ -96,8 +84,56 @@ jobs:
 
           echo "대상 일자: $D / 회차: ${S:-전부} (KST $(date +%F' '%H:%M))"
 
+      # 휴장일에는 아무것도 하지 않는다. 마감판은 그날 종가가 없고, 아침판도 원고가
+      # "오늘 장 전망"을 싣기 때문에 장이 안 서는 날에는 틀린 글이 된다.
+      #
+      # 판정 근거는 data/krx-holidays.json 하나다(scripts/gen_holidays.py가 굽는다).
+      # 같은 파일을 /api/cron/dispatch 와 ingest.ts 도 읽는다 — 셋이 같은 답을 내야 한다.
+      # 여기서 끊으면 원고 체크아웃(deploy key)까지 통째로 건너뛴다.
+      - name: 거래일 확인
+        id: market
+        run: |
+          D="${{ steps.date.outputs.trade_date }}"
+          TABLE=data/krx-holidays.json
+          END=$(jq -r '.range[1]' "$TABLE")
+          DOW=$(date -d "$D" +%u)   # 1=월 … 7=일
+
+          CLOSED=""
+          if [ "$DOW" -ge 6 ]; then
+            CLOSED="주말"
+          elif [ "$D" \> "$END" ]; then
+            # 캘린더가 1년 남짓 앞까지만 있다. 범위 밖은 거래일로 본다 —
+            # 모르는 날을 전부 휴장으로 보면 사이트가 조용히 멈춘다.
+            echo "::warning::휴장일 목록이 $END 에서 끝났다. scripts/gen_holidays.py 를 다시 돌려 커밋할 것."
+          elif jq -e --arg d "$D" '.holidays | index($d)' "$TABLE" > /dev/null; then
+            CLOSED="휴장일"
+          fi
+
+          if [ -n "$CLOSED" ]; then
+            echo "open=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::$D 는 $CLOSED — 브리핑을 올리지 않는다."
+            echo "### $D — $CLOSED, 스킵" >> "$GITHUB_STEP_SUMMARY"
+            echo "장이 서지 않는 날이라 브리핑을 올리지 않는다. 실패가 아니다." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "open=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # PAT 대신 read-only deploy key를 쓴다. 이 저장소에만 붙고, 쓰기가 아예 안 되고,
+      # 사람 계정 권한과 무관하게 해지된다(stock-analysis → Settings → Deploy keys).
+      - name: 원고 체크아웃 (stock-analysis, 읽기 전용)
+        if: steps.market.outputs.open == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: wlsdlstjdwls/stock-analysis
+          ssh-key: ${{ secrets.REPORTS_SSH_KEY }}
+          path: reports
+          # 원고만 받는다. 백테스트 산출물까지 받으면 느려진다.
+          sparse-checkout: 요약/뉴스
+          sparse-checkout-cone-mode: false
+
       - name: 원고 존재 확인
         id: source
+        if: steps.market.outputs.open == 'true'
         run: |
           D="${{ steps.date.outputs.trade_date }}"
           DIR=$(find "$REPORT_ROOT" -type d -name "$D" 2>/dev/null | head -1)

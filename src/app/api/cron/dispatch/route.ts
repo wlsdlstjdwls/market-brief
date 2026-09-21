@@ -17,6 +17,7 @@
 import { and, eq } from "drizzle-orm";
 import { db, hasDb } from "../../../../db/index";
 import { dailyBrief } from "../../../../db/schema";
+import { holidayRangeWarning, nonTradingReason } from "../../../../lib/trading-day";
 
 /** 적재는 GitHub에서 돌고 여기서는 호출만 한다. 캐시가 붙으면 안 된다. */
 export const dynamic = "force-dynamic";
@@ -91,6 +92,19 @@ export async function GET(req: Request) {
   const q = url.searchParams.get("s");
   const session: Session = q === "am" || q === "pm" ? q : sessionOf(now.hour);
   const date = url.searchParams.get("date") ?? now.date;
+
+  // 휴장일이면 러너를 깨우지 않는다. 주말은 cron 자체가 안 부르지만 공휴일은 안 걸러지고,
+  // 추석·설 같은 연휴는 회차마다 슬롯이 여섯·여덟 개씩 헛돈다.
+  // 워크플로와 ingest.ts에도 같은 검사가 있다 — 여기는 그중 제일 싼 자리일 뿐이다.
+  const closed = nonTradingReason(date);
+  if (closed) {
+    return Response.json({ ok: true, skipped: closed, date, session });
+  }
+
+  // 구워 둔 휴장일 목록이 바닥나면 그 뒤 날짜는 전부 거래일로 본다. 조용히 그렇게 되면
+  // 안 되므로 함수 로그에 남긴다(Vercel → Logs). 응답에는 싣지 않는다.
+  const warn = holidayRangeWarning(now.date);
+  if (warn) console.warn(warn);
 
   if (await alreadyPublished(date, session)) {
     return Response.json({ ok: true, skipped: "already-published", date, session });

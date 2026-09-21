@@ -5,8 +5,13 @@
  *   npm run ingest -- --publish            검사 통과 시 published 상태로 적재
  *   npm run ingest -- --session am         그 날짜의 오전(프리마켓)판만
  *   npm run ingest -- --skip-missing       지정한 회차가 아직 없으면 실패 대신 스킵 (자동 실행용)
+ *   npm run ingest -- --allow-non-trading  주말·휴장일 차단을 푼다 (과거 회차 보정용)
  *
  * 세션을 지정하지 않으면 그날 있는 회차를 전부 적재한다(오전판 + 오후판).
+ *
+ * **휴장일은 적재하지 않는다.** 원고 루틴이 휴장일에 글을 쓰는 사고가 나도 여기서 막힌다
+ * (`src/lib/trading-day.ts`). 자동 실행 경로에는 이 검사가 세 겹인데, 손으로 돌릴 때도
+ * 막히는 자리는 여기 하나뿐이라 진짜 방어선이다.
  *
  * 원본 파일은 읽기만 한다. 기존 텔레그램 파이프라인은 건드리지 않는다.
  */
@@ -17,6 +22,7 @@ import {
   type BriefPayload, type BriefSession, type MarketData,
 } from "../src/lib/extract";
 import { assertObjectClean, EquityMentionError, scan } from "../src/lib/guard";
+import { nonTradingLabel, nonTradingReason } from "../src/lib/trading-day";
 
 const argv = process.argv.slice(2);
 const flag = (n: string) => argv.includes(`--${n}`);
@@ -255,7 +261,31 @@ async function main() {
     process.exit(2);
   }
 
-  const all = findRuns(opt("date"));
+  /**
+   * 휴장일이면 true. 장이 안 서는 날은 am이든 pm이든, 원고가 있든 없든 올리지 않는다.
+   *
+   * 실패가 아니라 스킵이다 — 자동 실행이 휴장일마다 실패 알림을 쏘면 안 된다.
+   */
+  const closed = (date: string): boolean => {
+    if (flag("allow-non-trading")) return false;
+    const reason = nonTradingReason(date);
+    if (!reason) return false;
+    console.log(`${nonTradingLabel(date, reason)} — 적재하지 않는다.`);
+    console.log("과거 회차를 보정하느라 일부러 넣어야 하면 --allow-non-trading 을 붙인다.");
+    return true;
+  };
+
+  // 날짜를 받았으면 원고 폴더를 뒤지기 전에 끊는다. findRuns는 폴더가 없으면 던지는데,
+  // 휴장일에 원고가 없는 건 사고가 아니라 정상이라 예외로 올라가면 안 된다.
+  const explicit = opt("date");
+  if (explicit && closed(explicit)) return;
+
+  const all = findRuns(explicit);
+
+  // 날짜를 안 받았으면 findRuns가 고른 "가장 최근 원고 날짜"가 대상이다.
+  // 오늘 날짜로 판정하면 엉뚱한 날을 본다.
+  if (!explicit && closed(all[0].tradeDate)) return;
+
   const runs = want ? all.filter((r) => r.session === want) : all;
   if (!runs.length) {
     const date = all[0]?.tradeDate ?? opt("date");

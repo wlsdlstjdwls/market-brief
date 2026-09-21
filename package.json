@@ -17,7 +17,8 @@
     "verify": "tsx scripts/verify.ts",
     "notify": "tsx scripts/notify-telegram.ts",
     "admin:password": "node scripts/admin-password.mjs",
-    "db:page-view": "tsx --env-file=.env.local scripts/add-page-view.ts"
+    "db:page-view": "tsx --env-file=.env.local scripts/add-page-view.ts",
+    "holidays": "python scripts/gen_holidays.py"
   },
   "dependencies": {
     "@neondatabase/serverless": "latest",

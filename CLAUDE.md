@@ -38,6 +38,8 @@
 | `scripts/notify-telegram.ts` | 발행 알림을 채널로 보낸다. 중복·과거 회차를 막는다 |
 | `scripts/add-notified-at.ts` | `daily_brief.notified_at` 추가 (1회성, 2026-09-18 적용 완료, 기존 78회차를 발송 대상에서 제외) |
 | `scripts/fetch_market.py` | 실제 시세 수집 → `data/market/{날짜}.json` |
+| `src/lib/trading-day.ts` | 거래일 판정. 휴장일에는 브리핑을 올리지 않는다 |
+| `scripts/gen_holidays.py` | KRX 휴장일 목록을 굽는다 → `data/krx-holidays.json` (연 1회) |
 | `scripts/ingest.ts` | 적재 CLI |
 | `scripts/verify.ts` | 발행 결과 검증 (DB / 저장한 HTML) |
 | `scripts/brief-exists.ts` | (일자, 회차)가 이미 published인지 질의. 재시도 슬롯이 건너뛸 근거 |
@@ -563,6 +565,8 @@ npm run verify               # DB의 published 브리핑 검사
 npm run notify -- --dry-run  # 텔레그램에 나갈 문구 미리보기 (발송 안 함)
 npm run admin:password "비밀번호"  # 관리자 해시 (평문은 저장하지 않는다)
 npm run db:page-view         # page_view 표 만들기 (1회성, 이미 적용됨)
+npm run holidays             # KRX 휴장일 목록 재생성 (연 1회. exchange_calendars 필요)
+npm run ingest -- --allow-non-trading   # 주말·휴장일 차단을 푼다 (과거 회차 보정용)
 
 npm run ingest -- --date 2026-09-08 --session am --dry-run   # 오전판만 미리보기
 npm run ingest -- --session pm --skip-missing --publish       # 그 회차가 아직 없으면 실패 대신 스킵
@@ -670,6 +674,43 @@ GitHub를 부르지 않기 때문이다(아래 참고).
 
 **cron은 프로덕션 배포에만 등록된다.** `vercel.json`을 고쳤으면 `vercel deploy --prod`를 해야
 스케줄이 바뀐다. 푸시는 여전히 배포가 아니다(`git.deploymentEnabled: false`).
+
+### 휴장일에는 올리지 않는다 (2026-09-21)
+
+**휴장일 처리가 통째로 없었다**(사용자 지적). 주말은 cron이 막고 있었지만 공휴일은
+아무 데서도 안 걸러졌다. 추석(09-24·25)이 사흘 뒤였다.
+
+- **마감판**은 그날 종가가 아예 없다.
+- **아침판**도 원고가 "오늘 장 전망"을 싣기 때문에 장이 안 서는 날에는 틀린 글이 된다.
+  미국장은 열리니 뉴스 자체는 성립하지만, **둘 다 안 올리기로 했다**(사용자 지시).
+
+판정 근거는 `data/krx-holidays.json` **하나**다. `scripts/gen_holidays.py`가
+`exchange_calendars`의 **XKRX** 캘린더에서 굽는다 — 음력 연휴(설·추석), 대체공휴일,
+연말 마지막 영업일 휴장까지 들어 있다. 공공데이터포털 특일정보 API는 키가 필요하고
+그쪽 "공휴일"은 KRX 휴장일과 정확히 같지도 않다(연말 휴장이 공휴일이 아니다).
+
+**왜 파일로 굽나.** 판정이 필요한 런타임이 셋인데 다 다르다 — Vercel 함수, tsx CLI,
+워크플로 bash. 파이썬 캘린더를 세 군데서 부를 수 없어 결과만 남기고 셋이 같은 파일을 읽는다.
+KRX 휴장일은 연초에 확정 공시되므로 미리 구워도 정확도를 해치지 않는다.
+
+막는 자리가 셋이다.
+
+| 자리 | 하는 일 |
+|---|---|
+| `/api/cron/dispatch` | 휴장일이면 `{"skipped":"holiday"}`. **GitHub 러너를 안 깨운다** |
+| 워크플로 `거래일 확인` step | 여기서 끊으면 원고 체크아웃(deploy key)까지 건너뛴다 |
+| `ingest.ts` | 최종 방어선. **손으로 돌려도 막힌다** |
+
+- **범위 밖 날짜는 거래일로 본다.** 캘린더가 1년 남짓 앞까지만 들고 있는데, 모르는 날을
+  전부 휴장으로 보면 사이트가 조용히 멈춘다. 모르면 올리고 경고를 띄우는 쪽이 낫다 —
+  범위 끝 90일 전부터 워크플로가 `::warning::`을, 라우트가 함수 로그에 경고를 남긴다
+  (`holidayRangeWarning`). 뜨면 `npm run holidays`를 다시 돌려 커밋한다.
+- **주말은 목록에 담지 않는다.** 요일로 먼저 거른다. 담으면 판정이 두 군데가 되고
+  목록을 눈으로 셀 수도 없다.
+- 과거 회차를 일부러 넣어야 하면 `--allow-non-trading`을 붙인다.
+- **원고 루틴 두 개에도 휴장일 체크를 넣었다**(프롬프트 0번). 이건 **비용 절약일 뿐이고
+  방어선이 아니다** — 루틴이 판정에 실패하면 **그냥 쓰게** 해 뒀다. 거래일을 휴장일로
+  잘못 보고 건너뛰면 그날 브리핑이 통째로 비는데, 반대 실수는 market-brief가 막는다.
 
 ### 재시도 슬롯을 둔 이유 (2026-09-16)
 
@@ -1127,6 +1168,8 @@ KRX가 풀리거나 다른 소스를 찾기 전까지 과거 회차의 업종은
 - 푸시로 배포 트리거하기
 - 날짜 페이지에서 `searchParams` 읽기 (ISR이 죽는다 — 위 "회차 탭이 느렸던 이유")
 - 관리자 콘솔에서 DB 쓰기 (로그인 쿠키 말고는 읽기 전용이다)
+- 휴장일 브리핑 올리기 (`data/krx-holidays.json`이 막는다 — 위 "휴장일에는 올리지 않는다")
+- `data/krx-holidays.json`을 손으로 고치기 (`npm run holidays`가 굽는다)
 - 방문 집계에 IP·User-Agent·쿼리스트링 적기 (처리방침과 어긋난다)
 
 <!-- BEGIN:nextjs-agent-rules -->
