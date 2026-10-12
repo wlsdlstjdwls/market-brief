@@ -59,6 +59,16 @@ function writtenAt(dir: string): string | null {
     );
     // 원고는 전부 KST로 적는다. 오프셋을 박아 둬야 서버 시간대와 무관하게 같은 시각이 된다.
     if (m) return `${m[1]}T${m[2].padStart(2, "0")}:${m[3]}:00+09:00`;
+    // 2026-09-29부터 루틴이 그 줄을 빼고 제목에만 시각을 적는다.
+    // `# 일일 증시 리포트 — 2026년 10월 12일(월) 07:41 KST 아침판`
+    // 이걸 못 읽으면 오전판이 마감판으로 판정돼 아침 슬롯이 전부 건너뛴다.
+    const t = head.match(
+      /(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일[^\n]*?(\d{1,2}):(\d{2})\s*KST/,
+    );
+    if (t) {
+      const [, y, mo, d, h, mi] = t;
+      return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}T${h.padStart(2, "0")}:${mi}:00+09:00`;
+    }
   }
   return null;
 }
