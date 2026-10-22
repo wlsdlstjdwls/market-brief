@@ -18,6 +18,7 @@
 import { scan } from "./guard";
 import { cleanHeading, dedot, type Section } from "./markdown";
 import { cardSources, type SourceLink } from "./sources";
+import { stripMeta, stripMetaTitle } from "./meta";
 
 export type TopicKind = "news" | "theme" | "sector";
 
@@ -200,14 +201,15 @@ function collect(
 
   for (const b of blocksOf(spec, sections)) {
     const raw = dedot(cleanHeading(b.heading));
-    const title = spec.title ? spec.title(raw, b.source) : raw;
+    // 작성 메모(`(검색 요약)`, `… 수치 미확인`)를 걷어낸다. 제목이 통째로 메모면 카드도 버린다.
+    const title = stripMetaTitle(spec.title ? spec.title(raw, b.source) : raw);
 
     const values = spec.fields.map((f) => ({
       label: f.label,
-      text: dedot(field(b.body, f.match)),
+      text: stripMeta(dedot(field(b.body, f.match))),
     }));
     const lead = values[0];
-    if (!lead.text) continue; // 이 형식의 카드가 아니다
+    if (!title || !lead.text) continue; // 이 형식의 카드가 아니거나, 메모뿐인 카드다
     if (seen.has(title)) continue;
     seen.add(title);
 

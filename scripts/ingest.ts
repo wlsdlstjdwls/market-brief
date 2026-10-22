@@ -63,7 +63,8 @@ function writtenAt(dir: string): string | null {
     // `# 일일 증시 리포트 — 2026년 10월 12일(월) 07:41 KST 아침판`
     // 이걸 못 읽으면 오전판이 마감판으로 판정돼 아침 슬롯이 전부 건너뛴다.
     const t = head.match(
-      /(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일[^\n]*?(\d{1,2}):(\d{2})\s*KST/,
+      // `15:37 회차 (KST)`처럼 시각과 KST 사이에 말이 끼기도 한다(2026-10-22 마감판).
+      /(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일[^\n]*?(\d{1,2}):(\d{2})[^\n]*KST/,
     );
     if (t) {
       const [, y, mo, d, h, mi] = t;
@@ -90,8 +91,25 @@ function hhmmOf(iso: string | null): number | null {
 function sessionOf(dir: string, runId: string, fallback: BriefSession = "pm"): BriefSession {
   const hhmm =
     hhmmOf(writtenAt(dir)) ?? (/\d/.test(runId) ? Number(runId.replace(/\D/g, "")) : NaN);
-  if (!Number.isFinite(hhmm)) return fallback;
-  return hhmm < 1200 ? "am" : "pm";
+  if (Number.isFinite(hhmm)) return hhmm < 1200 ? "am" : "pm";
+  return editionOf(dir) ?? fallback;
+}
+
+/**
+ * 시각이 아예 없는 제목에서 판 이름으로 가른다.
+ * 2026-10-22 아침판 제목이 `# 일일 증시 리포트 — 2026년 10월 22일(목) 아침판 (KST)`였다.
+ * 시각을 못 읽으니 fallback `pm`으로 떨어져 아침 슬롯이 전부 건너뛰었고,
+ * 오후 run-1537/이 생긴 뒤에야 올라가 텔레그램이 마감판보다 늦게 나갔다.
+ */
+function editionOf(dir: string): BriefSession | null {
+  for (const name of SOURCE_ALLOW) {
+    const p = join(dir, name);
+    if (!existsSync(p)) continue;
+    const title = readFileSync(p, "utf8").match(/^#\s+.*$/m)?.[0] ?? "";
+    if (/아침판|오전판|프리마켓/.test(title)) return "am";
+    if (/마감판|장\s*마감/.test(title)) return "pm";
+  }
+  return null;
 }
 
 /**

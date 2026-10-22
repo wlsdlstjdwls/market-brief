@@ -1,3 +1,5 @@
+import { stripMeta } from "./meta";
+
 /** 원본 리포트 마크다운을 블록 단위로 쪼개는 최소 파서. */
 
 export interface Section {
@@ -87,7 +89,7 @@ const EMPTY_PARA = [
 
 /** 문단 단위로 쪼갠다 (차단 필터를 문단 단위로 적용하기 위함). */
 export function paragraphs(body: string): string[] {
-  return stripNoise(proseOnly(body))
+  return stripMeta(stripNoise(proseOnly(body)))
     .split(/\n\s*\n/)
     .map((p) => p.trim())
     .filter(Boolean)
