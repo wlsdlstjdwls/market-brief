@@ -48,7 +48,7 @@ function kstNow(): { date: string; hour: number } {
   };
 }
 
-/** 오전 슬롯(08:10~09:00)이면 프리마켓판, 오후 슬롯(16:40, 18:40)이면 마감 종합판. */
+/** 오전 슬롯(08:10~09:00)이면 프리마켓판, 오후 슬롯(16:40~18:00)이면 마감 종합판. */
 function sessionOf(hour: number): Session {
   return hour < 12 ? "am" : "pm";
 }
