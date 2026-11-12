@@ -23,7 +23,7 @@ export const SITE_URL = (() => {
 export const SITE_NAME = "더 브리핑";
 export const SITE_TITLE = "더 브리핑 — 매일 두 번, 오늘의 뉴스";
 export const SITE_DESCRIPTION =
-  "그날 시장을 움직인 뉴스와 테마를 정리하는 매일의 브리핑. 개별 종목은 다루지 않습니다.";
+  "그날 시장을 움직인 뉴스와 테마를 정리하는 매일의 브리핑. 매수, 매도 추천은 하지 않습니다.";
 
 /**
  * 텔레그램 채널. 발행 알림이 여기로 나가고, 화면의 "텔레그램으로 받기"가 여기로 보낸다.

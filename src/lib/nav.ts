@@ -2,4 +2,6 @@
 export const NAV = [
   { href: "/", label: "오늘" },
   { href: "/archive", label: "지난 브리핑" },
+  // 뉴스 브리핑과 별개의 지면이다. 종목은 여기에만 실린다 (src/lib/stocks.ts 머리말)
+  { href: "/stocks", label: "종목 브리핑" },
 ] as const;

@@ -11,7 +11,9 @@ import { SITE_URL } from "../lib/site";
  */
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: { userAgent: "*", allow: "/", disallow: ["/api/", "/admin"] },
+    // `/stocks`(종목 브리핑)는 색인하지 않는다(stock-analysis docs/market-brief-재무연동.md 3.3).
+    // 페이지의 robots noindex와 sitemap 제외가 같이 막는다
+    rules: { userAgent: "*", allow: "/", disallow: ["/api/", "/admin", "/stocks"] },
     sitemap: `${SITE_URL}/sitemap.xml`,
     host: SITE_URL,
   };

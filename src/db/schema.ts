@@ -221,3 +221,60 @@ export const pageView = pgTable(
     index("page_view_visitor_idx").on(t.visitorId, t.createdAt),
   ]
 );
+
+/**
+ * (폐기) 종목 브리핑 첫 판의 표. 회차 한 줄에 전부를 jsonb로 담았다.
+ * 원천이 회차당 1MB 가까이로 커져(수급, 공시, 현금흐름 추가) `fin_run` + `fin_stock`으로 갈아탔다.
+ * 원격에 표가 남아 있어 정의만 둔다. 읽는 코드는 없다. 지울지는 운영자가 정한다.
+ */
+export const stockWeekly = pgTable("stock_weekly", {
+  id: serial("id").primaryKey(),
+  runDate: date("run_date").notNull().unique(),
+  runId: varchar("run_id", { length: 32 }).notNull(),
+  data: jsonb("data").notNull(),
+  summary: text("summary"),
+  publishedAt: timestamp("published_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * 종목 브리핑 (주간 재무 추세) 회차. **종목이 들어가는 표는 이것과 `fin_stock` 둘뿐이다.**
+ *
+ * 뉴스 브리핑과 별개의 지면이다(2026-11-12 사용자 결정). 연동 규격은 stock-analysis의
+ * `docs/market-brief-재무연동.md`. 뉴스 적재, 텔레그램, RSS, verify.ts는 이 두 표를 읽지 않는다.
+ * `scripts/add-fin-tables.ts`로 만들었다(1회성, 아무것도 지우지 않는다).
+ */
+export const finRun = pgTable("fin_run", {
+  /** 원본 날짜 폴더 이름 */
+  runDate: date("run_date").primaryKey(),
+  /** 원본이 적은 수집 시각 (`2026-11-12 13:33 KST`) */
+  runAt: text("run_at").notNull(),
+  /** 원본 폴더 기준 상대 경로 (`2026/2026-11-12/run-1333`). 같은 날 재실행분을 가리는 근거 */
+  sourcePath: text("source_path").notNull(),
+  /** 수집 실패 [종목명, 사유] */
+  fails: jsonb("fails").notNull().default([]),
+  /** 주간 요약 원고 (`cleanSummary`를 거친 마크다운). 없는 회차도 있다 */
+  summary: text("summary"),
+  ingestedAt: timestamp("ingested_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** 회차의 종목 한 줄. 주 1회 통째로 갈아끼우는 스냅숏이라 정규화하지 않는다 */
+export const finStock = pgTable(
+  "fin_stock",
+  {
+    runDate: date("run_date")
+      .notNull()
+      .references(() => finRun.runDate, { onDelete: "cascade" }),
+    code: varchar("code", { length: 6 }).notNull(),
+    name: text("name").notNull(),
+    market: text("market"),
+    /** 관심종목 그룹 (업종 분류가 아니라 사용자가 정한 묶음) */
+    groupName: text("group_name").notNull(),
+    /** 원본 순서. 그룹 순서가 곧 관심 순서다 */
+    ord: integer("ord").notNull(),
+    /** 목록 화면용 요약 (`StockCard`). 카드, 표, 산점도가 이것만 읽는다 */
+    snap: jsonb("snap").notNull(),
+    /** 종목 화면용 전체 (`Stock`). 분기, 연간, 주봉, 수급, 현금흐름, 배당, 공시 */
+    detail: jsonb("detail").notNull(),
+  },
+  (t) => [uniqueIndex("fin_stock_pk").on(t.runDate, t.code)]
+);

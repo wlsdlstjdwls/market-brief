@@ -1,0 +1,106 @@
+# 종목 브리핑(주간 재무 추세) 적재. 뉴스 브리핑(daily-update.yml)과 별개다.
+#
+# 원본은 stock-analysis의 요약/재무/YYYY/YYYY-MM-DD/ 이고, 루틴이 매주 토요일 오전 9~10시에 쓴다.
+# 정시에 이걸 부르는 건 Vercel Cron이다(vercel.json → /api/cron/stocks → workflow_dispatch).
+# 아래 schedule은 Vercel이 죽은 날의 백업이다.
+#
+# 이 워크플로는 fin_run, fin_stock 두 표만 쓴다. 뉴스 쪽 표, 텔레그램, RSS는 건드리지 않는다.
+# 배포는 하지 않는다. 페이지가 revalidate=600이라 적재만 하면 10분 안에 뜬다.
+
+name: weekly-stocks
+
+on:
+  schedule:
+    - cron: "40 4 * * 6"   # 토 13:40 KST — 백업
+  workflow_dispatch:
+    inputs:
+      run_date:
+        description: "원본 폴더 날짜 YYYY-MM-DD (비우면 오늘 KST)"
+        required: false
+        type: string
+
+concurrency:
+  group: weekly-stocks
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TZ: Asia/Seoul
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      STOCK_ROOT: ${{ github.workspace }}/reports/요약/재무
+
+    steps:
+      - name: 본체 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 대상 일자
+        id: date
+        run: |
+          D="${{ inputs.run_date }}"
+          [ -z "$D" ] && D=$(date +%F)
+          echo "run_date=$D" >> "$GITHUB_OUTPUT"
+          echo "대상 일자: $D (KST $(date +%F' '%H:%M))"
+
+      # 뉴스 쪽과 같은 read-only deploy key다. 재무 폴더만 받는다.
+      - name: 원본 체크아웃 (stock-analysis, 읽기 전용)
+        uses: actions/checkout@v4
+        with:
+          repository: wlsdlstjdwls/stock-analysis
+          ssh-key: ${{ secrets.REPORTS_SSH_KEY }}
+          path: reports
+          sparse-checkout: 요약/재무
+          sparse-checkout-cone-mode: false
+
+      - name: 원본 존재 확인
+        id: source
+        run: |
+          D="${{ steps.date.outputs.run_date }}"
+          DIR="$STOCK_ROOT/${D:0:4}/$D"
+          if [ -d "$DIR" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            ls -1 "$DIR"
+            echo "### $D 종목 브리핑 — 적재 시도" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::$D 원본 없음 — 루틴이 아직 안 돌았다. 건너뛴다."
+            echo "### $D — 원본 없음, 스킵" >> "$GITHUB_STEP_SUMMARY"
+            echo "루틴이 아직 안 돌았다. 실패가 아니다." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.source.outputs.found == 'true'
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: 의존성 설치
+        if: steps.source.outputs.found == 'true'
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+
+      - name: 적재
+        if: steps.source.outputs.found == 'true'
+        run: |
+          npx tsx scripts/ingest-fin.ts \
+            --date "${{ steps.date.outputs.run_date }}" \
+            --skip-missing | tee /tmp/ingest.txt
+          { echo '```'; cat /tmp/ingest.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 실패 알림
+        if: failure()
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RUN_DATE: ${{ steps.date.outputs.run_date }}
+        run: |
+          if [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT" ]; then
+            echo "텔레그램 secret 없음 — 알림 건너뜀"
+            exit 0
+          fi
+          curl -sS -X POST "https://api.telegram.org/bot$TG_TOKEN/sendMessage" \
+            -d chat_id="$TG_CHAT" \
+            --data-urlencode "text=market-brief 종목 브리핑 적재 실패 — ${RUN_DATE}
+          ${RUN_URL}" > /dev/null

@@ -19,6 +19,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const latest = briefs[0]?.tradeDate;
 
+
   return [
     {
       url: `${SITE_URL}/`,

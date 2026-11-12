@@ -26,6 +26,18 @@
     {
       "path": "/api/cron/dispatch?s=pm&n=3",
       "schedule": "0 9 * * 1-5"
+    },
+    {
+      "path": "/api/cron/stocks",
+      "schedule": "30,40,50 0 * * 6"
+    },
+    {
+      "path": "/api/cron/stocks?n=2",
+      "schedule": "0,10,20,30,40,50 1 * * 6"
+    },
+    {
+      "path": "/api/cron/stocks?n=3",
+      "schedule": "0 2 * * 6"
     }
   ]
 }
