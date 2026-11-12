@@ -640,6 +640,13 @@ secret이 없으면 스크립트가 조용히 끝낸다(exit 0).
 - 산점도 가로축(영업이익 YoY)은 부호를 지킨 로그다. -80%부터 +2,700%까지 퍼져 선형이면 한쪽에 몰린다.
 - 이름표는 바깥쪽 점부터 달고, 겹치거나 판 밖이면 그 점은 이름 없이 둔다(호버로 보인다).
 
+### 배포 (2026-11-12)
+
+커밋 `03c05e3`을 `vercel deploy --prod`로 올렸다. 라이브 확인 — `/stocks`, `/stocks/{코드}` 200, 없는 코드 404,
+`/api/cron/stocks` 헤더 없이 401, `robots.txt`에 `Disallow: /stocks`, 페이지 `noindex, nofollow`, sitemap에 `/stocks` 0건,
+`vercel crons ls`에 stocks 3줄 등록. DB에는 11-12 run-1333(33종목)이 들어 있다.
+**첫 토요일 자동 실행은 2026-11-14 09:30부터다.** Vercel → Cron Jobs, `gh run list --workflow=weekly-stocks.yml` 순으로 본다.
+
 ### 자동 실행
 
 | | UTC | KST |
