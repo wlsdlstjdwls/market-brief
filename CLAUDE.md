@@ -645,15 +645,16 @@ secret이 없으면 스크립트가 조용히 끝낸다(exit 0).
 커밋 `03c05e3`을 `vercel deploy --prod`로 올렸다. 라이브 확인 — `/stocks`, `/stocks/{코드}` 200, 없는 코드 404,
 `/api/cron/stocks` 헤더 없이 401, `robots.txt`에 `Disallow: /stocks`, 페이지 `noindex, nofollow`, sitemap에 `/stocks` 0건,
 `vercel crons ls`에 stocks 3줄 등록. DB에는 11-12 run-1333(33종목)이 들어 있다.
-**첫 토요일 자동 실행은 2026-11-14 09:30부터다.** Vercel → Cron Jobs, `gh run list --workflow=weekly-stocks.yml` 순으로 본다.
+**첫 토요일 자동 실행은 2026-11-14 10:00부터다.** Vercel → Cron Jobs, `gh run list --workflow=weekly-stocks.yml` 순으로 본다.
 
 ### 자동 실행
 
 | | UTC | KST |
 |---|---|---|
-| Vercel cron | `30,40,50 0 * * 6` / `0,10,20,30,40,50 1 * * 6` / `0 2 * * 6` | 토 09:30 ~ 11:00, 10분 간격 |
+| Vercel cron | `0,10,20,30,40,50 1 * * 6` / `0 2 * * 6` | 토 10:00 ~ 11:00, 10분 간격 |
 | GitHub 백업 | `40 4 * * 6` | 토 13:40 |
 
+원본 푸시가 09:15~09:30이라 여유를 두고 10:00에 시작한다(2026-11-12 사용자 지시, 처음엔 09:30).
 라우트가 그날(KST) 회차가 이미 있으면 러너를 안 깨운다. 토요일은 휴장일이라 거래일 판정을 하지 않는다.
 원본 폴더 날짜가 **토요일 날짜**라는 가정이다. 루틴이 다른 날짜로 폴더를 만들면 슬롯이 전부 "원본 없음"으로
 끝난다 — 그때는 `workflow_dispatch`에 `run_date`를 넣어 손으로 돌린다.
