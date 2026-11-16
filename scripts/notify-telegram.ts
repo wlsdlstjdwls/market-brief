@@ -53,22 +53,44 @@ function todayKst(): string {
   }).format(new Date());
 }
 
+/**
+ * 텔레그램 쪽 일시 장애(5xx, 429)는 다시 쏜다. 2026-11-16 아침판이 502 Bad Gateway 한 번에
+ * 발송을 통째로 놓쳤다. 뒤 슬롯은 "이미 적재됨"이면 러너를 안 깨우므로 여기서 못 보내면 끝이다.
+ * 4xx(형식 오류 등)는 다시 쏴도 같으므로 바로 실패시킨다.
+ */
 async function send(text: string, preview: boolean): Promise<void> {
-  const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      chat_id: CHAT,
-      text,
-      // HTML 모드. 이스케이프할 글자가 &, <, > 셋뿐이라 사고가 나지 않는다 (notify.ts의 esc).
-      parse_mode: "HTML",
-      // 미리보기는 링크가 든 마지막 통에서만 켠다. 앞 통에 켜면 빈 카드가 붙는다.
-      disable_web_page_preview: !preview,
-    }),
-  });
-  const body = (await res.json()) as { ok?: boolean; description?: string };
-  if (!res.ok || !body.ok) {
-    throw new Error(`텔레그램 발송 실패 (${res.status}): ${body.description ?? "알 수 없음"}`);
+  const ATTEMPTS = 4;
+  for (let attempt = 1; ; attempt++) {
+    let status = 0;
+    let body: { ok?: boolean; description?: string; parameters?: { retry_after?: number } } = {};
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          chat_id: CHAT,
+          text,
+          // HTML 모드. 이스케이프할 글자가 &, <, > 셋뿐이라 사고가 나지 않는다 (notify.ts의 esc).
+          parse_mode: "HTML",
+          // 미리보기는 링크가 든 마지막 통에서만 켠다. 앞 통에 켜면 빈 카드가 붙는다.
+          disable_web_page_preview: !preview,
+        }),
+        signal: AbortSignal.timeout(30_000),
+      });
+      status = res.status;
+      body = (await res.json().catch(() => ({}))) as typeof body;
+      if (res.ok && body.ok) return;
+    } catch (e) {
+      body = { description: e instanceof Error ? e.message : String(e) };
+    }
+
+    const transient = status === 0 || status === 429 || status >= 500;
+    const msg = `텔레그램 발송 실패 (${status}): ${body.description ?? "알 수 없음"}`;
+    if (!transient || attempt >= ATTEMPTS) throw new Error(msg);
+
+    const waitS = body.parameters?.retry_after ?? 5 * attempt;
+    console.warn(`  ${msg} — ${waitS}초 뒤 다시 (${attempt}/${ATTEMPTS - 1})`);
+    await new Promise((r) => setTimeout(r, waitS * 1000));
   }
 }
 
