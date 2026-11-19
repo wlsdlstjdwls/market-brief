@@ -102,6 +102,15 @@ function impactLine(raw?: string): string {
   return v.startsWith("시장 영향") ? v : `시장 영향 ${v}`;
 }
 
+/** 묶음 머리. 굵은 가로줄로 덩어리를 가른다 — 카드 제목(굵게)과 한 단계 위로 읽혀야 한다. */
+const SECTION_RULE = "━━━━━━━━━━━━━━";
+function sectionHead(label: string): string {
+  return `${SECTION_RULE}\n<b>${esc(label)}</b>\n${SECTION_RULE}`;
+}
+
+/** 같은 묶음 안 카드 사이. 빈 줄만으로는 카드 안 항목 사이 빈 줄과 구별이 안 된다. */
+const CARD_RULE = "┈┈┈┈┈┈┈┈";
+
 /**
  * 보낼 문구(여러 통으로 쪼갠 것)와, 그중 검사할 부분.
  *
@@ -119,9 +128,14 @@ export function compose(
   const blocks: string[] = [];
   const plain: string[] = [headline, summary];
 
-  blocks.push(`<b>${esc(SITE_NAME)}</b>  ${esc(SESSION_LABEL[b.session])}\n${dateLine(b.tradeDate)}`);
-  blocks.push(`<b>${esc(headline)}</b>`);
-  if (summary && summary !== headline) blocks.push(esc(summary));
+  blocks.push(
+    `<b>${esc(SITE_NAME)}</b>  |  ${esc(SESSION_LABEL[b.session])}\n${dateLine(b.tradeDate)}`,
+  );
+  blocks.push(
+    summary && summary !== headline
+      ? `<b>${esc(headline)}</b>\n\n${esc(summary)}`
+      : `<b>${esc(headline)}</b>`,
+  );
 
   /**
    * 같은 카드가 두 번 실리는 걸 막는다. 원고에 같은 업종이 두 번 적히는 회차가 있고
@@ -130,6 +144,7 @@ export function compose(
    */
   const seen = new Set<string>();
   let lastKind = "";
+  let no = 0;
 
   for (const t of topics) {
     const title = cardTitle(t.title);
@@ -149,26 +164,34 @@ export function compose(
 
     // 묶음 제목은 실제로 실을 카드가 정해진 뒤에 붙인다. 먼저 붙이면 그 묶음의
     // 카드가 전부 걸러진 회차에서 제목만 덩그러니 남는다.
+    // 머리줄과 카드 사이 선은 카드와 한 덩어리로 둔다. 따로 두면 `pack`이 통을 가를 때
+    // 머리줄만 앞 통 끝에 남는다.
+    let lead: string;
     if (t.kind !== lastKind) {
-      blocks.push(`<b>${esc(KIND_LABEL[t.kind] ?? t.kind)}</b>`);
+      lead = sectionHead(KIND_LABEL[t.kind] ?? t.kind);
       lastKind = t.kind;
+      no = 0;
+    } else {
+      lead = CARD_RULE;
     }
+    no += 1;
 
-    const impact = impactLine(t.impact);
-    const body = [`<b>${esc(title)}</b>`];
-    if (impact) body.push(`<i>${esc(impact)}</i>`);
     plain.push(title);
+    const head = [`<b>${no}. ${esc(title)}</b>`];
+    const impact = impactLine(t.impact);
+    if (impact) head.push(`<code>${esc(impact)}</code>`);
 
     /*
-     * 항목 이름을 굵게 박는다. 맨 글자로 두면 `무슨 일인가 Fed는 ...`처럼 본문에
-     * 파묻혀 어디까지가 소제목인지 안 보인다(2026-09-21 사용자 지적).
-     * 화면에서는 `.topic-label`이 색과 굵기로 하는 일을 여기서는 `<b>`가 한다.
+     * 항목 이름은 **제 줄을 따로 잡는다**(2026-11-19 사용자 지적). 예전에는
+     * `<b>무슨 일인가</b>  본문`으로 한 줄에 붙였는데, 카드 제목도 굵게라 굵은 글씨가
+     * 둘 셋 겹쳐 무엇이 제목이고 무엇이 소제목인지 안 보였다. 굵게는 카드 제목 하나만 쓰고,
+     * 항목 이름은 `▸` 기울임으로 낮춰 본문 위에 얹는다. 항목 사이에 빈 줄을 둔다.
      */
-    for (const l of rows) {
-      body.push(l.label ? `<b>${esc(l.label)}</b>  ${esc(l.text)}` : esc(l.text));
+    const body = rows.map((l) => {
       plain.push(l.text);
-    }
-    blocks.push(body.join("\n"));
+      return l.label ? `<i>▸ ${esc(l.label)}</i>\n${esc(l.text)}` : esc(l.text);
+    });
+    blocks.push([lead, head.join("\n"), ...body].join("\n\n"));
   }
 
   for (const [label, md] of [
@@ -177,12 +200,11 @@ export function compose(
   ] as const) {
     const text = toPlain((md ?? "").trim());
     if (!text) continue;
-    blocks.push(`<b>${esc(label)}</b>`);
-    blocks.push(esc(text));
+    blocks.push(`${sectionHead(label)}\n\n${esc(text)}`);
     plain.push(text);
   }
 
-  blocks.push(`<a href="${url}">사이트에서 보기</a>`);
+  blocks.push(`${SECTION_RULE}\n<a href="${url}">사이트에서 전체 보기</a>`);
 
   // 검사 대상은 사람이 쓴 문장뿐이다. 링크와 날짜 줄, 서식 태그는 뺀다 (violations 주석 참고).
   return { chunks: pack(blocks), prose: plain.join("\n"), url };
