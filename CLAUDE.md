@@ -694,6 +694,16 @@ secret이 없으면 스크립트가 조용히 끝낸다(exit 0).
 `vercel crons ls`에 stocks 3줄 등록. DB에는 11-12 run-1333(33종목)이 들어 있다.
 **첫 토요일 자동 실행은 2026-11-14 10:00부터다.** Vercel → Cron Jobs, `gh run list --workflow=weekly-stocks.yml` 순으로 본다.
 
+### 배포 (2026-11-19)
+
+커밋 `f94b52c`(텔레그램 양식), `231ead8`(종목 브리핑 개편, 팝업, 평일 공시 갱신)을 `vercel deploy --prod`로 올렸다.
+라이브 확인 — `/stocks`, `/stocks/{코드}`, `/stocks/w/{날짜}` 200, 새 화면 요소(드롭다운, 바로가기 줄, 요약 2단) 실림,
+지운 고지 문구 0건, `/api/cron/stocks?mode=daily` 헤더 없이 401, `vercel crons ls`에 평일 `0 12 * * 1-5` 등록.
+**`DART_API_KEY` secret은 아직 없다** — 넣기 전까지 평일 갱신 워크플로는 "DART 키 확인" step에서 실패한다.
+
+**`vercel deploy`가 `Not authorized`로 거부되면 `--scope wlsdlstjdwls12-6759s-projects`를 붙인다.**
+이 PC의 CLI 기본 범위가 프로젝트의 팀과 달라서 났다.
+
 ### 자동 실행
 
 | | UTC | KST |
