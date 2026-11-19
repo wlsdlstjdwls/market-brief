@@ -130,7 +130,48 @@ export type Stock = {
   } | null;
   /** 부가 데이터 수집 실패 표시 */
   warn: string[];
+  /**
+   * 평일 새 공시로 이 종목만 다시 수집했으면 그 기록(`applyPatch`). 토요일 정기 회차는 없다.
+   * 다음 토요일 회차가 들어오면 종목 줄이 통째로 갈리므로 저절로 사라진다.
+   */
+  patch?: StockPatch | null;
 };
+
+/**
+ * 평일 공시 갱신 기록 (2026-11-19 사용자 지시, "회차는 토요일만, 새 공시 있는 종목만 고쳐 달라").
+ * `on` 다시 수집한 날(KST), `titles` 계기가 된 공시 제목, `seen` 그때까지 본 공시 접수번호.
+ * `seen`이 있어야 같은 공시로 다음 날 또 다시 수집하지 않는다.
+ */
+export type StockPatch = { on: string; titles: string[]; seen: string[] };
+
+/** DART 공시 주소의 접수번호(`rcpNo=20261112900396`) */
+export function rcpNoOf(url: string): string | null {
+  const m = url.match(/rcpNo=(\d{14})/);
+  return m ? m[1] : null;
+}
+
+/**
+ * 이 종목에 대해 이미 본 공시 접수번호. 저장된 공시 목록(정기보고서는 적재 때 빠진다)과
+ * 지난 갱신 때 본 번호를 합친다. 평일 확인 스크립트가 여기 없는 번호만 새 공시로 친다.
+ */
+export function knownReceipts(s: Pick<Stock, "disc" | "patch">): string[] {
+  const out = new Set<string>();
+  for (const d of s.disc ?? []) {
+    const n = rcpNoOf(d.url);
+    if (n) out.add(n);
+  }
+  for (const n of s.patch?.seen ?? []) out.add(n);
+  return [...out];
+}
+
+/**
+ * 새로 수집한 종목을 회차의 기존 줄에 끼운다. 그룹은 회차 것을 지킨다 — 평일 수집기는 임시 관심종목
+ * 목록으로 돌아서 그룹 이름이 회차와 다를 수 있다. `seen`에는 이전에 본 번호도 남긴다.
+ */
+export function applyPatch(fresh: Stock, prev: Pick<Stock, "sector" | "disc" | "patch">, patch: StockPatch): Stock {
+  const seen = [...new Set([...knownReceipts(prev), ...patch.seen])];
+  return { ...fresh, sector: prev.sector, patch: { on: patch.on, titles: patch.titles, seen } };
+}
 
 export type StockWeekData = {
   runAt: string;
@@ -529,6 +570,8 @@ export type StockCard = {
   signals: string[];
   /** 최근 52주 종가 */
   spark: number[];
+  /** 평일 새 공시로 이 종목만 다시 수집한 날과 그 공시 제목. 없으면 토요일 회차 그대로다 */
+  patched?: { on: string; titles: string[] } | null;
 };
 
 export function toCard(s: Stock): StockCard {
@@ -575,6 +618,7 @@ export function toCard(s: Stock): StockCard {
     deficit: n.deficit,
     signals: s.signals,
     spark: s.weekly.slice(-52).map((w) => w.c),
+    patched: s.patch ? { on: s.patch.on, titles: s.patch.titles } : null,
   };
 }
 

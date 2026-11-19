@@ -5,7 +5,7 @@
  */
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { cleanSummary, pickRun, trimData } from "../src/lib/stocks";
+import { applyPatch, cleanSummary, knownReceipts, pickRun, rcpNoOf, toCard, trimData, type Stock } from "../src/lib/stocks";
 
 test("추천 표현이 든 줄은 버리고 수급 용어는 남긴다", () => {
   const md = [
@@ -112,4 +112,47 @@ test("잠정실적이 나왔는데 분기 숫자에 안 들어간 회사를 찾�
   // 4분기 다음은 이듬해 1분기. 1분기 말(03-31) 전 공시는 4분기 것이라 해당 없음
   assert.equal(pendingResults("2025Q4", [{ d: "2026-02-05", cat: "실적", title: "", url: "x" }]), null);
   assert.equal(pendingResults(null, disc), null);
+});
+
+/*
+ * 평일 공시 갱신(2026-11-19). 같은 공시로 매일 다시 수집하면 안 되고, 회차의 그룹은 지켜야 한다.
+ */
+const DART = (n: string) => `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${n}`;
+
+test("공시 주소에서 접수번호를 뽑는다", () => {
+  assert.equal(rcpNoOf(DART("20261112900396")), "20261112900396");
+  assert.equal(rcpNoOf("https://example.com/x"), null);
+});
+
+test("이미 본 공시는 저장된 목록과 지난 갱신 기록을 합친다", () => {
+  const known = knownReceipts({
+    disc: [{ d: "2026-11-12", cat: "수주", title: "단일판매", url: DART("20261112900396") }],
+    patch: { on: "2026-11-18", titles: ["분기보고서"], seen: ["20261118000111"] },
+  });
+  assert.deepEqual(known.sort(), ["20261112900396", "20261118000111"]);
+});
+
+test("갱신은 그룹을 지키고, 본 공시 번호를 쌓고, 카드에 표시를 단다", () => {
+  const raw = {
+    stocks: [
+      {
+        name: "테스트",
+        code: "123456",
+        sector: "임시그룹",
+        snap: { price: 1000, last_q: "2026Q3", deficit: false },
+        quarters: [],
+        annual: [],
+        weekly: [],
+        disc: [],
+      },
+    ],
+  };
+  const fresh = trimData(raw).stocks[0];
+  const prev = { sector: "반도체", disc: [], patch: { on: "2026-11-17", titles: ["a"], seen: ["20261117000001"] } };
+  const merged = applyPatch(fresh, prev, { on: "2026-11-19", titles: ["분기보고서 (2026.09)"], seen: ["20261119000002"] });
+  assert.equal(merged.sector, "반도체");
+  assert.deepEqual(merged.patch?.seen.sort(), ["20261117000001", "20261119000002"]);
+  const card = toCard(merged as Stock);
+  assert.deepEqual(card.patched, { on: "2026-11-19", titles: ["분기보고서 (2026.09)"] });
+  assert.equal(card.sector, "반도체");
 });

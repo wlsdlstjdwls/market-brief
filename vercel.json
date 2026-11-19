@@ -34,6 +34,10 @@
     {
       "path": "/api/cron/stocks?n=2",
       "schedule": "0 2 * * 6"
+    },
+    {
+      "path": "/api/cron/stocks?mode=daily",
+      "schedule": "0 12 * * 1-5"
     }
   ]
 }

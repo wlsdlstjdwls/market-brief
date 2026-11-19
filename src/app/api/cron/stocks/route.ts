@@ -10,6 +10,9 @@
  * 토요일은 휴장일이라 `trading-day.ts`를 보지 않는다.
  *
  * 환경변수는 `/api/cron/dispatch`와 같다 (CRON_SECRET, GH_DISPATCH_TOKEN, GH_REPO).
+ *
+ * `?mode=daily`는 평일 21:00 공시 갱신(2026-11-19)이다. `daily-stocks.yml`을 깨운다.
+ * 이미 본 공시는 워크플로가 걸러 내므로 여기서는 DB를 보지 않고 바로 부른다.
  */
 import { eq } from "drizzle-orm";
 import { db, hasDb } from "../../../../db/index";
@@ -18,6 +21,7 @@ import { finRun } from "../../../../db/schema";
 export const dynamic = "force-dynamic";
 
 const WORKFLOW = "weekly-stocks.yml";
+const DAILY_WORKFLOW = "daily-stocks.yml";
 const REPO = process.env.GH_REPO ?? "wlsdlstjdwls/market-brief";
 
 function kstToday(): string {
@@ -55,7 +59,10 @@ export async function GET(req: Request) {
   const q = url.searchParams.get("date");
   const date = q && /^\d{4}-\d{2}-\d{2}$/.test(q) ? q : kstToday();
 
-  if (await alreadyLoaded(date)) {
+  const daily = url.searchParams.get("mode") === "daily";
+  const workflow = daily ? DAILY_WORKFLOW : WORKFLOW;
+
+  if (!daily && (await alreadyLoaded(date))) {
     return Response.json({ ok: true, skipped: "already-loaded", date });
   }
 
@@ -65,7 +72,7 @@ export async function GET(req: Request) {
   }
 
   const res = await fetch(
-    `https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW}/dispatches`,
+    `https://api.github.com/repos/${REPO}/actions/workflows/${workflow}/dispatches`,
     {
       method: "POST",
       headers: {
@@ -74,7 +81,7 @@ export async function GET(req: Request) {
         "x-github-api-version": "2022-11-28",
         "content-type": "application/json",
       },
-      body: JSON.stringify({ ref: "main", inputs: { run_date: date } }),
+      body: JSON.stringify({ ref: "main", inputs: daily ? { today: date } : { run_date: date } }),
     },
   );
 
@@ -87,5 +94,5 @@ export async function GET(req: Request) {
     );
   }
 
-  return Response.json({ ok: true, dispatched: WORKFLOW, date });
+  return Response.json({ ok: true, dispatched: workflow, date });
 }

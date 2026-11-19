@@ -20,7 +20,7 @@ on:
         type: string
 
 concurrency:
-  group: weekly-stocks
+  group: stocks-ingest   # 평일 공시 갱신(daily-stocks.yml)과 겹치지 않게
   cancel-in-progress: false
 
 jobs:

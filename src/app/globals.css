@@ -804,8 +804,7 @@ html:not([data-session="am"]) .ses--am {
    종목 이름 열은 붙여 둔다(sticky). 스크롤해도 어느 줄인지 놓치지 않게. */
 
 .stk-disclaimer {
-  margin: 18px 0 0;
-  max-width: 62ch;
+  margin: 12px 0 0;
   font-size: 12.5px;
   line-height: 1.8;
   color: var(--faint);
@@ -913,8 +912,10 @@ html:not([data-session="am"]) .ses--am {
 }
 
 /* 주간 요약 원고 안의 표. 원고가 그리는 표라 열 수를 모른다 — 제 안에서 스크롤한다 */
+/* 폭 상한을 두지 않는다. 요약은 `.stx-sum-part`의 오른쪽 칸을 다 쓴다(2026-11-19,
+   66ch로 묶여 본문 폭의 절반만 쓰던 것을 풀었다) */
 .stk-prose {
-  max-width: 66ch;
+  max-width: none;
 }
 
 .stk-prose table {
@@ -1287,6 +1288,309 @@ html:not([data-session="am"]) .ses--am {
   font-style: normal;
   color: var(--fainter);
   font-weight: 400;
+}
+
+/* 산점도 + 사분면 목록. 넓으면 나란히, 좁으면 위아래 */
+.stx-fig-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px 36px;
+  align-items: start;
+}
+
+@media (min-width: 1000px) {
+  .stx-fig-body {
+    grid-template-columns: minmax(0, 680px) minmax(0, 1fr);
+  }
+}
+
+.stx-quads {
+  margin: 14px 0 0;
+  border-top: 1px solid var(--rule-strong);
+}
+
+.stx-quad-row {
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.stx-quad-row dt {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--faint);
+}
+
+.stx-quad-row dt em {
+  margin-left: 4px;
+  font-style: normal;
+  color: var(--fg);
+}
+
+.stx-quad-row dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin: 5px 0 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.stx-quad-row dd a:hover {
+  color: var(--accent);
+}
+
+/* 보기 전환 버튼 글자가 좁은 화면에서 세로로 쪼개졌다("카/드"). 줄을 넘기되 버튼 글자는 안 접는다 */
+.stx-head {
+  flex-wrap: wrap;
+}
+
+.stx-head h2 {
+  white-space: nowrap;
+}
+
+.stx-view {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.stx-view button {
+  white-space: nowrap;
+}
+
+/* 휴대폰에서는 카드가 한 줄에 하나라 33종목이면 화면 30장 넘게 내려간다. 카드를 낮게 */
+@media (max-width: 560px) {
+  .stx-card {
+    gap: 4px;
+    padding: 12px 14px 13px;
+  }
+
+  .stx-card-name {
+    font-size: 16px;
+  }
+
+  .stx-card-price b {
+    font-size: 17px;
+  }
+
+  .stx-card .spark {
+    height: 28px;
+  }
+
+  .stx-card-facts {
+    padding-top: 6px;
+  }
+}
+
+.stx-head-note {
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+/* 바로가기 줄. 넓은 화면에서는 상단 바(48px) 바로 아래에 붙어 따라온다.
+   좁은 화면에서는 상단 바가 두 줄로 접혀 높이가 달라지므로 붙이지 않는다 */
+.stx-toc {
+  display: flex;
+  gap: 4px 22px;
+  overflow-x: auto;
+  margin: 0 0 22px;
+  padding: 10px 0;
+  border-top: 1px solid var(--rule-strong);
+  border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+
+.stx-toc::-webkit-scrollbar {
+  display: none;
+}
+
+.stx-toc a {
+  color: var(--muted);
+}
+
+.stx-toc a:hover {
+  color: var(--accent);
+}
+
+.stx-toc .stx-toc-latest {
+  margin-left: auto;
+  color: var(--accent);
+}
+
+@media (min-width: 900px) {
+  .stx-toc {
+    position: sticky;
+    top: 48px;
+    z-index: 5;
+    background: var(--bg);
+  }
+}
+
+/* 바로가기로 뛰었을 때 상단 바와 바로가기 줄에 가리지 않게 */
+#stx-overview,
+#stx-scatter,
+#stx-list,
+#stx-summary,
+#stx-weeks {
+  scroll-margin-top: 110px;
+}
+
+/* 탐색기 위 굵은 선은 바로가기 줄이 대신한다 */
+.stx-toc + .stx {
+  border-top: 0;
+  padding-top: 0;
+}
+
+/* 이번 주 요약. 절 제목은 왼쪽 좁은 칸, 내용은 오른쪽 넓은 칸 */
+.stx-sum {
+  margin-top: 48px;
+}
+
+.stx-sum-part {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  padding: 22px 0;
+  border-top: 1px solid var(--line);
+}
+
+.stx-sum .stx-head + .stx-sum-part {
+  border-top-color: var(--rule-strong);
+}
+
+@media (min-width: 820px) {
+  .stx-sum-part {
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 10px 36px;
+  }
+}
+
+.stx-sum-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.5;
+}
+
+.stx-sum-no {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.stx-sum .stk-prose > :first-child {
+  margin-top: 0;
+}
+
+.stx-sum .stk-prose > :last-child {
+  margin-bottom: 0;
+}
+
+/* `반도체: …` 이름표 문단. 이름표 칸과 본문 칸, 행마다 점선 */
+.stk-prose p.stk-kv {
+  display: grid;
+  grid-template-columns: 8.5em minmax(0, 1fr);
+  gap: 4px 18px;
+  margin: 0;
+  padding: 10px 0;
+  border-bottom: 1px dotted var(--line-dot);
+}
+
+.stk-prose p.stk-kv:first-child {
+  padding-top: 0;
+}
+
+.stk-prose p.stk-kv:last-child {
+  border-bottom: 0;
+}
+
+.stk-prose p.stk-kv > b {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+@media (max-width: 560px) {
+  .stk-prose p.stk-kv {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 목록 위 짧은 소제목(흑자전환, 적자전환 …) */
+.stk-prose p.stk-sub {
+  margin: 18px 0 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+
+.stk-prose p.stk-sub:first-child {
+  margin-top: 0;
+}
+
+.stk-prose-table {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 0 0.9rem;
+}
+
+.stk-prose .stk-prose-table table {
+  display: table;
+  width: 100%;
+  margin: 0;
+}
+
+/* 지난 회차. 날짜 칸을 가로로 깐다 */
+.stx-weeks-sec {
+  margin-top: 40px;
+}
+
+.stx-weeks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  border-top: 1px solid var(--rule-strong);
+  border-left: 1px solid var(--line);
+}
+
+.stx-weeks a {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+}
+
+.stx-weeks a b {
+  font-size: 15px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.stx-weeks a span {
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.stx-weeks a:hover {
+  box-shadow: inset 0 0 0 2px var(--fg);
+}
+
+.stx-weeks a[aria-current="page"] {
+  box-shadow: inset 0 -3px 0 var(--accent);
+}
+
+.stx-weeks a[aria-current="page"] b {
+  color: var(--accent);
 }
 
 .stx-view {
@@ -2790,4 +3094,822 @@ html:not([data-session="am"]) .ses--am {
 .bar-cell b {
   position: relative;
   font-weight: 600;
+}
+
+/* ---------- 종목 브리핑 가독성 (2026-11-19) ----------
+   사용자 지적: "보기가 힘들다, 가시성 가독성이 낮다". 원인은 셋이었다.
+   1) 보조 글자색이 크림 배경에서 대비 3:1 안팎(--faint #8c9095, --fainter #a4a8ac)이라 작은 글씨가 안 읽혔다
+   2) 이름표, 단위, 칩 글자가 11~12.5px로 작았다
+   3) 카드와 패널이 배경과 같은 색이라 덩어리가 안 갈렸다
+   이 지면(`stocks/layout.tsx`의 `.stk-page`) 안에서만 토큰을 진하게 다시 잡고 글자를 키우고,
+   카드와 패널에 흰 바탕을 깐다. 뉴스 지면은 건드리지 않는다. */
+
+.stk-page {
+  --muted: #45494e;
+  --faint: #5d6166;
+  --fainter: #75797e;
+  --faintest: #9a9893;
+  --line: #d6d2c9;
+  --surface: #ffffff;
+}
+
+.stk-page .edition {
+  font-size: 13.5px;
+}
+
+.stk-page .stk-disclaimer {
+  font-size: 13px;
+}
+
+.stk-page .stx-toc {
+  font-size: 14.5px;
+  font-weight: 500;
+}
+
+.stk-page .stx-toc a {
+  color: var(--fg);
+}
+
+/* 검색과 칩 */
+.stk-page .stx-search {
+  background: var(--surface);
+  font-size: 16px; /* 16px 미만이면 iOS가 입력할 때 화면을 확대한다 */
+}
+
+.stk-page .stx-sort select {
+  background: var(--surface);
+  font-size: 15px;
+}
+
+.stk-page .stx-chips button,
+.stk-page .stx-view button {
+  padding: 7px 12px;
+  background: var(--surface);
+  font-size: 14px;
+  color: var(--fg);
+}
+
+.stk-page .stx-chips button[aria-pressed="true"],
+.stk-page .stx-view button[aria-pressed="true"] {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+/* 요약 숫자: 흰 칸 넷 */
+.stk-page .stx-stats {
+  gap: 10px;
+  border-top: 0;
+}
+
+.stk-page .stx-stat {
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.stk-page .stx-stat > span {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.stk-page .stx-stat > b {
+  font-size: 34px;
+}
+
+.stk-page .stx-stat small {
+  font-size: 13px;
+}
+
+.stk-page .stx-split {
+  height: 8px;
+}
+
+/* 산점도 패널 */
+.stk-page .stx-fig {
+  padding: 20px 22px 18px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.stk-page .stx-fig figcaption h2,
+.stk-page .stx-head h2 {
+  font-size: 21px;
+}
+
+.stk-page .stx-fig figcaption p {
+  font-size: 14.5px;
+  color: var(--lead);
+}
+
+.stk-page .stx-tick,
+.stk-page .stx-axis-title {
+  font-size: 12px;
+}
+
+.stk-page .stx-quad {
+  font-size: 12.5px;
+  fill: var(--fainter);
+}
+
+.stk-page .stx-dot {
+  stroke: var(--surface);
+}
+
+.stk-page .stx-dot-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  stroke: var(--surface);
+}
+
+.stk-page .stx-tip {
+  background: var(--surface);
+}
+
+.stk-page .stx-quad-row dt {
+  font-size: 13.5px;
+  color: var(--fg);
+}
+
+.stk-page .stx-quad-row dd {
+  font-size: 14.5px;
+}
+
+/* 카드: 흰 바탕, 칸 사이 틈 */
+.stk-page .stx-cards {
+  gap: 12px;
+  border: 0;
+}
+
+.stk-page .stx-cards > li {
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.stk-page .stx-card {
+  gap: 8px;
+  padding: 16px 18px 18px;
+}
+
+.stk-page .stx-card-sector {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.stk-page .stx-card-name {
+  font-size: 19px;
+}
+
+.stk-page .stx-card-price {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.stk-page .stx-card-price b {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.stk-page .spark {
+  height: 44px;
+}
+
+.stk-page .spark polyline {
+  stroke-width: 2;
+}
+
+.stk-page .stx-card-facts {
+  font-size: 12.5px;
+  border-top: 1px solid var(--line);
+}
+
+.stk-page .stx-card-facts b {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.stk-page .stx-card-tags span {
+  font-size: 12.5px;
+}
+
+/* 표 */
+.stk-page .stk-table table {
+  font-size: 14.5px;
+}
+
+.stk-page .stk-table thead th {
+  font-size: 13px;
+  color: var(--fg);
+}
+
+.stk-page .stk-table th,
+.stk-page .stk-table td {
+  padding: 10px 14px 10px 0;
+}
+
+.stk-page .stk-note {
+  font-size: 13px;
+  max-width: none;
+}
+
+/* 요약 글 */
+.stk-page .stx-sum .stk-prose {
+  font-size: 16px;
+  line-height: 1.85;
+  color: var(--fg);
+}
+
+.stk-page .stx-sum-title {
+  font-size: 17px;
+}
+
+.stk-page .stx-sum-no {
+  font-size: 13px;
+}
+
+.stk-page .stk-prose p.stk-sub {
+  font-size: 13.5px;
+}
+
+.stk-page .stk-prose table {
+  font-size: 14.5px;
+}
+
+.stk-page .stk-prose thead th {
+  font-size: 13px;
+  color: var(--fg);
+}
+
+/* 지난 회차 칸 */
+.stk-page .stx-weeks a {
+  background: var(--surface);
+}
+
+.stk-page .stx-weeks a span {
+  font-size: 13px;
+}
+
+/* 종목 상세 숫자 칸 */
+.stk-page .sd-tile {
+  background: var(--surface);
+}
+
+.stk-page .sd-tile > span {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.stk-page .sd-tile > b {
+  font-size: 24px;
+}
+
+.stk-page .sd-tile small {
+  font-size: 13px;
+}
+
+.stk-page .sec-label {
+  font-size: 13px;
+}
+
+.stk-page .sec-note {
+  font-size: 12.5px;
+}
+
+@media (max-width: 560px) {
+  .stk-page .stx-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .stk-page .stx-stat {
+    padding: 12px 14px;
+  }
+
+  .stk-page .stx-stat > b {
+    font-size: 26px;
+  }
+
+  .stk-page .stx-fig {
+    padding: 14px 12px;
+  }
+
+  .stk-page .stx-cards {
+    gap: 8px;
+  }
+
+  .stk-page .stx-card {
+    padding: 13px 14px 14px;
+  }
+
+  .stk-page .spark {
+    height: 32px;
+  }
+}
+
+/* ---------- 종목 상세 팝업 (StockModal) ----------
+   fitin-app `common_bottom_sheet.scss`를 옮겼다(2026-11-19 사용자 지시). 768px 미만은 바텀시트,
+   이상은 가운데 팝업. 시트 위 모서리 12px, 손잡이 36x4, 헤더와 손잡이 줄은 touch-action: none
+   (없으면 브라우저가 터치를 스크롤로 가로채 pointercancel이 나서 끌기가 씹힌다).
+   이 지면의 다른 칸은 각지게 두지만 시트만은 fitin-app 모양을 따른다. */
+
+.bs-overlay,
+.bs-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.bs-overlay {
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.bs {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 94dvh;
+  border-top: 1px solid rgba(20, 16, 12, 0.16);
+  border-radius: 12px 12px 0 0;
+  background: var(--bg);
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.12), 0 -2px 12px rgba(0, 0, 0, 0.06);
+  padding-bottom: env(safe-area-inset-bottom);
+  outline: none;
+}
+
+.bs-handle-row {
+  flex-shrink: 0;
+  padding: 14px 0 12px;
+  touch-action: none;
+  cursor: grab;
+}
+
+.bs-handle {
+  width: 36px;
+  height: 4px;
+  margin: 0 auto;
+  border-radius: 999px;
+  background: rgba(20, 16, 12, 0.14);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.bs-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+  padding: 0 20px 12px;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.bs-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+}
+
+/* 회색 바탕 없이 X만. 글리프 끝을 헤더 오른쪽 여백선에 맞춘다(fitin-app 실측값) */
+.bs-close {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-right: -10px;
+  margin-top: -3px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(20, 16, 20, 0.8);
+  font-size: 20px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bs-close:hover {
+  color: #141014;
+}
+
+.bs-close:active {
+  transform: scale(0.92);
+}
+
+.bs-content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 0 16px 32px;
+  border-top: 1px solid var(--line);
+}
+
+/* 팝업 안에서는 페이지용 큰 여백을 줄인다 */
+.bs-content .masthead {
+  padding-top: 22px;
+}
+
+@media (min-width: 768px) {
+  .bs-overlay {
+    align-items: center;
+    justify-content: center;
+  }
+
+  .bs {
+    width: min(1080px, calc(100vw - 48px));
+    height: min(92dvh, 1400px);
+    border: 1px solid rgba(20, 16, 12, 0.16);
+    border-radius: 10px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+  }
+
+  .bs-handle-row {
+    display: none;
+  }
+
+  .bs-header {
+    padding: 16px 22px 14px;
+  }
+
+  .bs-content {
+    padding: 0 clamp(18px, 3vw, 36px) 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bs-overlay,
+  .bs {
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ---------- 종목 브리핑 오르내림 색 (2026-11-19, 사용자 지적 "빨강 파랑 색상도 별로") ----------
+   예전 값(#a32d22 벽돌, #1b5e9e 남색)은 탁해서 오르내림이 한눈에 안 들어왔다.
+   선명한 크림슨과 코발트로 바꿨다. 둘 다 크림 배경에서 글자 대비 4.5:1 이상이고
+   dataviz 검증기(색약 판별 ΔE 22.7, 일반 ΔE 32.1)를 통과한다.
+   파랑이 브랜드 블루(#2563eb)와 겹치므로 이 지면에서는 그룹 이름표와 잠정실적 꼬리표를
+   브랜드 블루 대신 잉크색으로 둔다. 파랑은 "내렸다" 하나만 뜻한다. */
+
+.stk-page {
+  --up: #c8283a;
+  --down: #2263c9;
+  --up-bg: #fff0f0;
+  --down-bg: #eef4ff;
+}
+
+.stk-page .stx-card-sector {
+  color: var(--faint);
+}
+
+.stk-page .stx-card-tags .is-pending,
+.stk-page .stk-table .is-pending {
+  border-color: var(--fg);
+  color: var(--fg);
+}
+
+.stk-page .sd-pending {
+  border-left-color: var(--fg);
+}
+
+/* 카드의 3개월 등락은 옅은 바탕을 깐 알약으로. 숫자만 색을 바꾸면 작은 글씨에서 색이 안 보인다 */
+.stk-page .stx-card-price > span.stk-up,
+.stk-page .stx-card-price > span.stk-down {
+  padding: 2px 8px;
+  font-size: 13.5px;
+}
+
+.stk-page .stx-card-price > span.stk-up {
+  background: var(--up-bg);
+}
+
+.stk-page .stx-card-price > span.stk-down {
+  background: var(--down-bg);
+}
+
+.stk-page .sd-price em.stk-up,
+.stk-page .sd-price em.stk-down {
+  padding: 1px 7px;
+}
+
+.stk-page .sd-price em.stk-up {
+  background: var(--up-bg);
+}
+
+.stk-page .sd-price em.stk-down {
+  background: var(--down-bg);
+}
+
+/* 카드 안 주가 선은 52주 모양만 보여 준다. 예전에는 1년 방향으로 빨강, 파랑을 칠했는데
+   바로 옆 알약(3개월 등락)과 기간이 달라 "빨간 선 옆 파란 -23.9%"처럼 서로 어긋나 보였다.
+   색은 3개월 알약 하나만 쓰고 선은 잉크색으로 둔다 */
+.stk-page .stx-card .spark polyline {
+  stroke: var(--muted);
+}
+
+/* 평일 공시 갱신 표시 (2026-11-19). 오르내림 색과 겹치지 않게 진한 초록 계열 대신 잉크 바탕을 쓴다 */
+.stk-page .stx-card-tags .is-patched {
+  border-color: var(--fg);
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.stk-page .sd-patched,
+.stk-page .stx-patched-note {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--fg);
+  background: var(--surface);
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--muted);
+}
+
+.stk-page .sd-patched b {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+/* 드롭다운 (StockExplorer `Dropdown`: 그룹, 시장, 정렬). 기본 select는 펼친 목록을 운영체제가 그려
+   디자인이 안 먹는다. 칩 줄을 이걸로 접었다(2026-11-19 사용자 지시) */
+.stx-selects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stx-dd {
+  position: relative;
+}
+
+.stx-dd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 12px 0 14px;
+  border: 1px solid var(--line);
+  background: var(--surface, var(--bg));
+  font: inherit;
+  font-size: 15px;
+  color: var(--fg);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.stx-dd-label {
+  font-size: 13px;
+  color: var(--faint);
+}
+
+.stx-dd-value {
+  font-weight: 600;
+}
+
+.stx-dd-btn:hover,
+.stx-dd-btn[aria-expanded="true"] {
+  border-color: var(--fg);
+}
+
+.stx-dd-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* "전체"가 아닌 값이 걸려 있으면 채운다 */
+.stx-dd.is-filtered .stx-dd-btn {
+  border-color: var(--fg);
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.stx-dd.is-filtered .stx-dd-label {
+  color: var(--faintest);
+}
+
+.stx-dd-caret {
+  width: 12px;
+  height: 12px;
+  margin-left: 2px;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+
+.stx-dd-btn[aria-expanded="true"] .stx-dd-caret {
+  transform: rotate(180deg);
+}
+
+.stx-dd-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  min-width: max(100%, 200px);
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px 0;
+  list-style: none;
+  border: 1px solid var(--fg);
+  background: var(--surface, var(--bg));
+  box-shadow: 0 10px 28px rgba(20, 22, 26, 0.14);
+  outline: none;
+  animation: stx-dd-in 0.12s ease-out;
+}
+
+/* 줄 끝 단추(정렬)는 목록을 오른쪽에 붙인다. 화면 밖으로 안 나가게 */
+.stx-dd:last-child .stx-dd-list {
+  left: auto;
+  right: 0;
+}
+
+@keyframes stx-dd-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.stx-dd-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 14px;
+  font-size: 15px;
+  white-space: nowrap;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.stx-dd-list li em {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 13px;
+  color: var(--faint);
+}
+
+.stx-dd-list li.is-active {
+  background: var(--bg);
+}
+
+.stx-dd-list li[aria-selected="true"] {
+  font-weight: 600;
+}
+
+.stx-dd-list li svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+/* 휴대폰: 검색 한 줄, 드롭다운 셋이 그 아래 한 줄을 나눠 쓴다 */
+@media (max-width: 560px) {
+  .stx-selects {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .stx-dd-btn {
+    width: 100%;
+    padding: 0 10px;
+    gap: 6px;
+    font-size: 14px;
+  }
+
+  .stx-dd-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .stx-dd-caret {
+    margin-left: auto;
+  }
+
+  .stx-dd-list {
+    min-width: max(100%, 180px);
+  }
+
+  /* 가운데 단추 목록도 화면 밖으로 안 나가게 */
+  .stx-dd:nth-child(2) .stx-dd-list {
+    left: 50%;
+    transform: translateX(-50%);
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stx-dd-list {
+    animation: none;
+  }
+
+  .stx-dd-caret {
+    transition: none;
+  }
+}
+
+/* 바로가기 줄을 모든 폭에서 상단 바 바로 아래에 붙인다(2026-11-19, "모바일에서 상단 고정이 안 된다").
+   상단 바 높이는 휴대폰에서 줄바꿈 따라 달라지므로 `StockPageChrome`이 재서 --topbar-h에 넣는다.
+   값을 못 받은 첫 그림에서는 48px(넓은 화면 실측)로 붙는다 */
+.stk-page .stx-toc {
+  position: sticky;
+  top: var(--topbar-h, 48px);
+  z-index: 5;
+  background: var(--bg);
+}
+
+.stk-page #stx-overview,
+.stk-page #stx-scatter,
+.stk-page #stx-list,
+.stk-page #stx-summary,
+.stk-page #stx-weeks {
+  scroll-margin-top: calc(var(--topbar-h, 48px) + 56px);
+}
+
+/* 맨 위로 단추. 한 화면 넘게 내려가면 오른쪽 아래에 뜬다. 바텀시트(z 60)보다 아래 */
+.stk-top {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(20px, calc(env(safe-area-inset-bottom) + 12px));
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 14px 0 12px;
+  border: 1px solid var(--fg);
+  background: var(--fg);
+  color: var(--bg);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 6px 18px rgba(20, 22, 26, 0.18);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+  transition: opacity 0.18s, transform 0.18s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.stk-top.is-on {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.stk-top:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.stk-top:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.stk-top svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* 휴대폰에서는 글자 없이 정사각 단추. 카드 숫자를 덜 가린다 */
+@media (max-width: 560px) {
+  .stk-top {
+    width: 46px;
+    height: 46px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .stk-top span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stk-top {
+    transition: none;
+  }
 }

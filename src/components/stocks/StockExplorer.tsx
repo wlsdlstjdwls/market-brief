@@ -11,7 +11,7 @@
  * 서버가 그걸 읽으면 ISR 캐시가 죽는다.
  */
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Sparkline from "./Sparkline";
 import Term from "../Term";
 import {
@@ -28,7 +28,7 @@ import { PER_DISTORTED, type StockCard } from "../../lib/stocks";
 export type ExplorerItem = StockCard;
 
 type NumKey = {
-  [K in keyof StockCard]: StockCard[K] extends number | null ? K : never;
+  [K in keyof StockCard]-?: StockCard[K] extends number | null ? K : never;
 }[keyof StockCard];
 
 type SortKey = "order" | NumKey;
@@ -151,65 +151,62 @@ export default function StockExplorer({
           onChange={(e) => setQ(e.target.value)}
           aria-label="종목 검색"
         />
-        <label className="stx-sort">
-          <span>정렬</span>
-          <select
+        {/* 그룹, 시장, 정렬. 칩 줄이 두세 줄로 쌓여 첫 화면을 먹던 것을 드롭다운 셋으로 접었다
+            (2026-11-19 사용자 지시). 고른 값이 "전체"가 아니면 단추를 채워 걸려 있다는 걸 보인다 */}
+        <div className="stx-selects">
+          <Dropdown
+            id="group"
+            label="그룹"
+            value={sector ?? ""}
+            options={[
+              { value: "", label: "전체", count: items.length },
+              ...sectors.map((s) => ({
+                value: s,
+                label: s,
+                count: items.filter((i) => i.sector === s).length,
+              })),
+            ]}
+            onChange={(v) => setSector(v || null)}
+          />
+          {markets.length > 1 ? (
+            <Dropdown
+              id="market"
+              label="시장"
+              value={market ?? ""}
+              options={[
+                { value: "", label: "전체", count: items.length },
+                ...markets.map((m) => ({
+                  value: m,
+                  label: m,
+                  count: items.filter((i) => i.market === m).length,
+                })),
+              ]}
+              onChange={(v) => setMarket(v || null)}
+            />
+          ) : null}
+          <Dropdown
+            id="sort"
+            label="정렬"
             value={sort}
-            onChange={(e) => {
-              setSort(e.target.value as SortKey);
+            // 기본값이라 채우지 않는다. 정렬은 걸러 내는 게 아니다
+            neutral
+            options={SORTS.map(([k, label]) => ({ value: k, label }))}
+            // 표 머리글로 고른 정렬은 목록에 없다
+            fallback="표 머리글 기준"
+            onChange={(k) => {
+              setSort(k as SortKey);
               setDir(-1);
             }}
-          >
-            {SORTS.map(([k, label]) => (
-              <option key={k} value={k}>
-                {label}
-              </option>
-            ))}
-            {/* 머리글로 고른 정렬이 목록에 없으면 그 이름을 그대로 보여 준다 */}
-            {SORTS.some(([k]) => k === sort) ? null : <option value={sort}>표 머리글 기준</option>}
-          </select>
-        </label>
-      </div>
-      <div className="stx-chips" role="group" aria-label="그룹">
-        <button type="button" aria-pressed={sector === null} onClick={() => setSector(null)}>
-          전체 <em>{items.length}</em>
-        </button>
-        {sectors.map((s) => (
-          <button
-            key={s}
-            type="button"
-            aria-pressed={sector === s}
-            onClick={() => setSector(sector === s ? null : s)}
-          >
-            {s} <em>{items.filter((i) => i.sector === s).length}</em>
-          </button>
-        ))}
-      </div>
-      {markets.length > 1 ? (
-        <div className="stx-chips stx-chips--sub" role="group" aria-label="시장">
-          <span>시장</span>
-          <button type="button" aria-pressed={market === null} onClick={() => setMarket(null)}>
-            전체
-          </button>
-          {markets.map((m) => (
-            <button
-              key={m}
-              type="button"
-              aria-pressed={market === m}
-              onClick={() => setMarket(market === m ? null : m)}
-            >
-              {m} <em>{items.filter((i) => i.market === m).length}</em>
-            </button>
-          ))}
+          />
         </div>
-      ) : null}
+      </div>
 
       {shown.length ? (
         <>
           <Stats items={shown} />
           <Scatter items={shown} />
 
-          <div className="stx-head">
+          <div className="stx-head" id="stx-list">
             <h2>
               종목 <em>{shown.length}</em>
             </h2>
@@ -235,6 +232,139 @@ export default function StockExplorer({
           </button>
         </p>
       )}
+    </div>
+  );
+}
+
+/* ---------- 드롭다운 (그룹, 시장, 정렬) ---------- */
+
+type Opt = { value: string; label: string; count?: number };
+
+/**
+ * 고르기 단추. 브라우저 기본 `<select>`는 펼친 목록에 디자인을 입힐 수 없어(운영체제가 그린다)
+ * 직접 그린다(2026-11-19 사용자 지적). 접근성은 listbox 패턴을 따른다 —
+ * 위아래 화살표로 옮기고 Enter, Space로 고르고 Esc, 바깥 누르기, Tab으로 닫는다.
+ *
+ * `value`가 목록에 없으면 `fallback`을 적는다(표 머리글로 고른 정렬). 첫 항목("전체")이 아닌 값이
+ * 걸려 있으면 단추를 채운다 — 필터가 걸린 채라는 걸 한눈에 보이게. `neutral`이면 채우지 않는다.
+ */
+function Dropdown({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+  fallback,
+  neutral = false,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  options: Opt[];
+  onChange: (v: string) => void;
+  fallback?: string;
+  neutral?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const wrap = useRef<HTMLDivElement>(null);
+  const btn = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLUListElement>(null);
+  const idx = options.findIndex((o) => o.value === value);
+  const current = idx >= 0 ? options[idx].label : (fallback ?? "");
+  const filtered = !neutral && idx > 0;
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    list.current?.focus();
+    // 고른 항목이 보이게
+    list.current?.querySelector(".is-active")?.scrollIntoView({ block: "nearest" });
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [open]);
+
+  const show = () => {
+    setActive(Math.max(0, idx));
+    setOpen(true);
+  };
+  const pick = (i: number) => {
+    onChange(options[i].value);
+    setOpen(false);
+    btn.current?.focus();
+  };
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown") setActive((a) => Math.min(options.length - 1, a + 1));
+    else if (e.key === "ArrowUp") setActive((a) => Math.max(0, a - 1));
+    else if (e.key === "Home") setActive(0);
+    else if (e.key === "End") setActive(options.length - 1);
+    else if (e.key === "Enter" || e.key === " ") pick(active);
+    else if (e.key === "Escape") {
+      setOpen(false);
+      btn.current?.focus();
+    } else if (e.key === "Tab") setOpen(false);
+    else return;
+    if (e.key !== "Tab") e.preventDefault();
+  };
+
+  return (
+    <div className={`stx-dd${filtered ? " is-filtered" : ""}`} ref={wrap}>
+      <button
+        ref={btn}
+        type="button"
+        className="stx-dd-btn"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`${label}: ${current}`}
+        onClick={() => (open ? setOpen(false) : show())}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            show();
+          }
+        }}
+      >
+        <span className="stx-dd-label">{label}</span>
+        <span className="stx-dd-value">{current}</span>
+        <svg className="stx-dd-caret" viewBox="0 0 12 12" aria-hidden="true">
+          <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        </svg>
+      </button>
+      {open ? (
+        <ul
+          ref={list}
+          className="stx-dd-list"
+          role="listbox"
+          tabIndex={-1}
+          aria-label={label}
+          aria-activedescendant={`stx-dd-${id}-${active}`}
+          onKeyDown={onKey}
+        >
+          {options.map((o, i) => (
+            <li
+              key={o.value || "_all"}
+              id={`stx-dd-${id}-${i}`}
+              role="option"
+              aria-selected={o.value === value}
+              className={i === active ? "is-active" : undefined}
+              onPointerEnter={() => setActive(i)}
+              onClick={() => pick(i)}
+            >
+              <span>
+                {o.label}
+                {o.count !== undefined ? <em>{o.count}</em> : null}
+              </span>
+              {o.value === value ? (
+                <svg viewBox="0 0 12 12" aria-hidden="true">
+                  <path d="M2 6.5 5 9.5 10 3" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                </svg>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
@@ -273,7 +403,7 @@ function Stats({ items }: { items: ExplorerItem[] }) {
   const medOpm = median(items.map((s) => s.opm).filter((v): v is number => v !== null));
 
   return (
-    <div className="stx-stats">
+    <div className="stx-stats" id="stx-overview">
       <div className="stx-stat">
         <span>영업이익 (전년 동기 대비)</span>
         <b>
@@ -384,7 +514,7 @@ function Scatter({ items }: { items: ExplorerItem[] }) {
   }
 
   return (
-    <figure className="stx-fig">
+    <figure className="stx-fig" id="stx-scatter">
       <figcaption>
         <h2>실적과 주가</h2>
         <p>
@@ -392,6 +522,7 @@ function Scatter({ items }: { items: ExplorerItem[] }) {
           오른쪽 아래는 실적이 늘었는데 주가는 빠진 종목입니다. 점을 누르면 종목 화면으로 갑니다.
         </p>
       </figcaption>
+      <div className="stx-fig-body">
       <div className="stx-plot" ref={wrap}>
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="영업이익 YoY와 3개월 주가 등락 산점도">
           {/* 사분면 바탕 글자. 데이터보다 흐리게 */}
@@ -437,8 +568,8 @@ function Scatter({ items }: { items: ExplorerItem[] }) {
                 onBlur={() => setHover(null)}
                 aria-label={`${p.name}, 영업이익 YoY ${fmtChange(p.opYoy)}, 3개월 ${fmtChange(p.chg3m)}`}
               >
-                {/* 맞히기 쉬운 투명 원. 점(8px)만으로는 손가락이 못 맞힌다 */}
-                <circle cx={cx} cy={cy} r={13} fill="transparent" />
+                {/* 맞히기 쉬운 투명 원. 휴대폰에서 그림이 절반 크기로 줄어 r=13이면 손가락으로 못 맞혔다 */}
+                <circle cx={cx} cy={cy} r={22} fill="transparent" />
                 <circle
                   className={`stx-dot stx-dot--${p.chg3m! >= 0 ? "up" : "down"}${on ? " is-on" : ""}`}
                   cx={cx}
@@ -478,7 +609,58 @@ function Scatter({ items }: { items: ExplorerItem[] }) {
           </div>
         ) : null}
       </div>
+      <Quadrants pts={pts} onHover={setHover} />
+      </div>
     </figure>
+  );
+}
+
+/**
+ * 산점도 옆 사분면 목록. 점 위의 이름표는 겹치면 빠지므로(바깥쪽 8개만) 어느 칸에 누가
+ * 있는지를 글로 한 번 더 적는다. 넓은 화면에서 산점도 오른쪽 빈자리를 쓴다.
+ * 이름에 올리면 산점도의 그 점이 커진다.
+ */
+const QUADS: Array<{ key: string; label: string; test: (s: ExplorerItem) => boolean }> = [
+  { key: "uu", label: "실적 증가, 주가 상승", test: (s) => s.opYoy! >= 0 && s.chg3m! >= 0 },
+  { key: "ud", label: "실적 증가, 주가 하락", test: (s) => s.opYoy! >= 0 && s.chg3m! < 0 },
+  { key: "du", label: "실적 감소, 주가 상승", test: (s) => s.opYoy! < 0 && s.chg3m! >= 0 },
+  { key: "dd", label: "실적 감소, 주가 하락", test: (s) => s.opYoy! < 0 && s.chg3m! < 0 },
+];
+
+function Quadrants({
+  pts,
+  onHover,
+}: {
+  pts: ExplorerItem[];
+  onHover: (s: ExplorerItem | null) => void;
+}) {
+  return (
+    <dl className="stx-quads">
+      {QUADS.map((q) => {
+        const list = pts.filter(q.test);
+        return (
+          <div key={q.key} className="stx-quad-row">
+            <dt>
+              {q.label} <em>{list.length}</em>
+            </dt>
+            <dd>
+              {list.length
+                ? list.map((s) => (
+                    <Link
+                      key={s.code}
+                      href={`/stocks/${s.code}`}
+                      onMouseEnter={() => onHover(s)}
+                      onMouseLeave={() => onHover(null)}
+                    >
+                      {s.name}
+                    </Link>
+                  ))
+                : <span className="stx-tip-faint">없음</span>}
+            </dd>
+          </div>
+        );
+      })}
+    </dl>
   );
 }
 
@@ -491,6 +673,8 @@ function Cards({ items }: { items: ExplorerItem[] }) {
         const tags = [...new Set(s.signals.map(tagOf).filter((t): t is string => !!t))].slice(0, 2);
         // 잠정실적이 나왔는데 숫자는 아직 이전 분기다. 카드 숫자를 오해하지 않게 맨 앞에 단다
         const pending = s.pending ? `${qLabel(s.pending.quarter)} 잠정실적 미반영` : null;
+        // 평일 새 공시로 이 종목만 다시 수집했다. 다른 종목보다 숫자 기준일이 새롭다
+        const patched = s.patched ? `${s.patched.on.slice(5).replace("-", ".")} 공시 반영` : null;
         return (
           <li key={s.code}>
             <Link href={`/stocks/${s.code}`} className="stx-card">
@@ -518,8 +702,13 @@ function Cards({ items }: { items: ExplorerItem[] }) {
                   <b>{s.deficit ? "적자" : fmtMultiple(s.per)}</b>
                 </span>
               </span>
-              {tags.length || pending ? (
+              {tags.length || pending || patched ? (
                 <span className="stx-card-tags">
+                  {patched ? (
+                    <span className="is-patched" title={s.patched!.titles.join(", ")}>
+                      {patched}
+                    </span>
+                  ) : null}
                   {pending ? <span className="is-pending">{pending}</span> : null}
                   {tags.map((t) => (
                     <span key={t}>{t}</span>

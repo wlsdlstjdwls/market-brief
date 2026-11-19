@@ -1,0 +1,105 @@
+# 종목 브리핑 평일 공시 갱신 (2026-11-19 사용자 지시).
+#
+# 회차는 토요일(weekly-stocks.yml)에만 만든다. 평일 21:00 KST에 최신 회차 종목들에 새 공시가
+# 있는지 DART에서 보고, 있는 종목만 다시 수집해 그 회차 안에서 갈아 끼운다.
+#
+#   Vercel Cron(평일 12:00 UTC) → /api/cron/stocks?mode=daily → workflow_dispatch → 여기
+#
+# 수집기는 stock-analysis의 fin_trend.py를 읽기 전용으로 받아 그대로 실행한다(고치지 않는다).
+# 같은 날 두 번 돌아도 안전하다 — 이미 본 공시 접수번호는 다시 수집하지 않는다.
+#
+# 필요한 secret: DATABASE_URL, REPORTS_SSH_KEY(기존), DART_API_KEY(새로 추가).
+
+name: daily-stocks
+
+on:
+  schedule:
+    - cron: "30 14 * * 1-5"   # 평일 23:30 KST — Vercel이 죽은 날의 백업
+  workflow_dispatch:
+    inputs:
+      today:
+        description: "확인 기준일 YYYY-MM-DD (비우면 오늘 KST)"
+        required: false
+        type: string
+
+concurrency:
+  group: stocks-ingest   # 토요일 적재와 겹치지 않게
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TZ: Asia/Seoul
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DART_API_KEY: ${{ secrets.DART_API_KEY }}
+
+    steps:
+      - name: 본체 체크아웃
+        uses: actions/checkout@v4
+
+      - name: DART 키 확인
+        run: |
+          if [ -z "$DART_API_KEY" ]; then
+            echo "::error::DART_API_KEY secret이 없다. gh secret set DART_API_KEY 로 넣는다."
+            exit 1
+          fi
+
+      - name: 수집기 체크아웃 (stock-analysis, 읽기 전용)
+        uses: actions/checkout@v4
+        with:
+          repository: wlsdlstjdwls/stock-analysis
+          ssh-key: ${{ secrets.REPORTS_SSH_KEY }}
+          path: reports
+          sparse-checkout: |
+            fin_trend.py
+            fin_dashboard_template.html
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 의존성 설치
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+
+      - name: 대상 목록
+        run: mkdir -p /tmp/fin && npx tsx scripts/fin-daily-targets.ts /tmp/fin/targets.json
+
+      - name: 새 공시 확인, 바뀐 종목만 다시 수집
+        run: |
+          python scripts/fin_daily.py \
+            --fin-trend reports/fin_trend.py \
+            --targets /tmp/fin/targets.json \
+            --out /tmp/fin \
+            ${{ inputs.today && format('--today {0}', inputs.today) || '' }} | tee /tmp/fin/check.txt
+
+      - name: 적재
+        run: |
+          npx tsx scripts/patch-fin.ts --dir /tmp/fin | tee /tmp/fin/patch.txt
+          {
+            echo "### 종목 브리핑 공시 갱신"
+            echo '```'; cat /tmp/fin/check.txt /tmp/fin/patch.txt; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 실패 알림
+        if: failure()
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT" ]; then
+            echo "텔레그램 secret 없음 — 알림 건너뜀"
+            exit 0
+          fi
+          curl -sS -X POST "https://api.telegram.org/bot$TG_TOKEN/sendMessage" \
+            -d chat_id="$TG_CHAT" \
+            --data-urlencode "text=market-brief 종목 공시 갱신 실패
+          ${RUN_URL}" > /dev/null
