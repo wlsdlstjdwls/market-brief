@@ -29,7 +29,7 @@ concurrency:
 jobs:
   patch:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45  # 다시 수집이 종목당 수십 초. 분기보고서 몰리는 주는 20종목 넘게 걸린다(2026-11-20 15분 초과)
     env:
       TZ: Asia/Seoul
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
