@@ -17,7 +17,7 @@ import Term from "../Term";
 import {
   fmtChange,
   fmtDelta,
-  fmtEok,
+  fmtAmt,
   fmtInt,
   fmtMultiple,
   fmtPrice,
@@ -25,7 +25,6 @@ import {
   fmtRatio,
   isUsd,
   toneOf,
-  unitOf,
 } from "../../lib/stock-format";
 import { PER_DISTORTED, type StockCard } from "../../lib/stocks";
 
@@ -785,14 +784,13 @@ type Col = {
   text?: boolean;
 };
 
-const won = (v: number | null) => (v === null ? "-" : fmtEok(v));
 
 const COLS: Record<Exclude<View, "card">, Col[]> = {
   fin: [
     { label: "시장", cell: (s) => s.market ?? "-", text: true },
-    { label: "시총", key: "mcap", cell: (s) => fmtEok(s.mcap) },
-    { label: "분기 매출", key: "revQ", cell: (s) => won(s.revQ) },
-    { label: "분기 영업이익", key: "opQ", cell: (s) => won(s.opQ), tone: (s) => (s.opQ !== null && s.opQ < 0 ? -1 : null) },
+    { label: "시총", key: "mcap", cell: (s) => fmtAmt(s.mcap, s.cur) },
+    { label: "분기 매출", key: "revQ", cell: (s) => fmtAmt(s.revQ, s.cur) },
+    { label: "분기 영업이익", key: "opQ", cell: (s) => fmtAmt(s.opQ, s.cur), tone: (s) => (s.opQ !== null && s.opQ < 0 ? -1 : null) },
     { label: "영업이익률", key: "opm", cell: (s) => fmtRatio(s.opm) },
     { label: "매출 YoY", key: "revYoy", cell: (s) => fmtChange(s.revYoy), tone: (s) => s.revYoy },
     { label: "영업이익 YoY", key: "opYoy", cell: (s) => fmtChange(s.opYoy), tone: (s) => s.opYoy },
@@ -826,14 +824,14 @@ const COLS: Record<Exclude<View, "card">, Col[]> = {
     { label: "지수 대비 3개월", key: "rel3m", cell: (s) => fmtDelta(s.rel3m, "%p"), tone: (s) => s.rel3m },
     { label: "52주 위치", key: "pos52", cell: (s) => <Pos52 v={s.pos52} /> },
     { label: "고가 대비", key: "fromHi", cell: (s) => fmtChange(s.fromHi), tone: (s) => s.fromHi },
-    { label: "외국인 20일", key: "frgn20", cell: (s) => won(s.frgn20), tone: (s) => s.frgn20 },
-    { label: "기관 20일", key: "organ20", cell: (s) => won(s.organ20), tone: (s) => s.organ20 },
+    { label: "외국인 20일", key: "frgn20", cell: (s) => fmtAmt(s.frgn20, s.cur), tone: (s) => s.frgn20 },
+    { label: "기관 20일", key: "organ20", cell: (s) => fmtAmt(s.organ20, s.cur), tone: (s) => s.organ20 },
     { label: "외국인 지분율", key: "holdNow", cell: (s) => fmtRatio(s.holdNow) },
     { label: "지분율 60일 변화", key: "holdChg60", cell: (s) => fmtDelta(s.holdChg60, "%p"), tone: (s) => s.holdChg60 },
   ],
   cash: [
-    { label: "영업CF", key: "ocfFy", cell: (s) => won(s.ocfFy), tone: (s) => (s.ocfFy !== null && s.ocfFy < 0 ? -1 : null) },
-    { label: "FCF", key: "fcfFy", cell: (s) => won(s.fcfFy), tone: (s) => (s.fcfFy !== null && s.fcfFy < 0 ? -1 : null) },
+    { label: "영업CF", key: "ocfFy", cell: (s) => fmtAmt(s.ocfFy, s.cur), tone: (s) => (s.ocfFy !== null && s.ocfFy < 0 ? -1 : null) },
+    { label: "FCF", key: "fcfFy", cell: (s) => fmtAmt(s.fcfFy, s.cur), tone: (s) => (s.fcfFy !== null && s.fcfFy < 0 ? -1 : null) },
     { label: "영업CF/순이익", key: "cashConv", cell: (s) => fmtRatio(s.cashConv) },
     { label: "주당배당금", key: "dps", cell: (s) => fmtPrice(s.dps, s.cur) },
     { label: "배당수익률", key: "divYield", cell: (s) => fmtRatio(s.divYield) },
@@ -874,7 +872,6 @@ function Table({
   /** 해외 목록. 금액은 억달러이고 외국인, 기관 수급 열이 없다 */
   usd: boolean;
 }) {
-  const unit = unitOf(usd ? "USD" : "KRW");
   const cols = COLS[view].filter((c) => !(usd && FLOW_ONLY_KRW.has(c.label)));
   return (
     <>
@@ -928,12 +925,12 @@ function Table({
       </div>
       <p className="stk-note">
         {view === "fin"
-          ? `금액은 ${unit}입니다. PER ${PER_DISTORTED}배 이상은 이익이 0에 가까워 생긴 왜곡이라 흐리게 표시하고 정렬에서 뒤로 보냅니다. 분기 옆 *는 다음 분기 ${usd ? "실적 발표" : "잠정실적"}가 나왔지만 분기보고서 제출 전이라 숫자에 아직 안 들어간 종목입니다.${usd ? " 해외 종목의 분기는 달력 분기로 맞췄습니다." : ""}`
+          ? `PER ${PER_DISTORTED}배 이상은 이익이 0에 가까워 생긴 왜곡이라 흐리게 표시하고 정렬에서 뒤로 보냅니다. 분기 옆 *는 다음 분기 ${usd ? "실적 발표" : "잠정실적"}가 나왔지만 분기보고서 제출 전이라 숫자에 아직 안 들어간 종목입니다.${usd ? " 해외 종목의 분기는 달력 분기로 맞췄습니다." : ""}`
           : view === "flow"
             ? usd
               ? "주가는 달러입니다. 지수 대비는 나스닥 종합(NYSE 상장은 S&P 500) 기준입니다. 52주 위치는 저가 0, 고가 100입니다."
-              : "수급 금액은 일별 순매수 수량에 종가를 곱한 근사치입니다(억원). 52주 위치는 저가 0, 고가 100입니다."
-            : `현금흐름은 직전 사업연도 기준(${unit})입니다. 다음 실적일은 과거 발표 패턴으로 추정한 값이라 확정 일정이 아닙니다.`}
+              : "수급 금액은 일별 순매수 수량에 종가를 곱한 근사치입니다. 52주 위치는 저가 0, 고가 100입니다."
+            : `현금흐름은 직전 사업연도 기준입니다. 다음 실적일은 과거 발표 패턴으로 추정한 값이라 확정 일정이 아닙니다.`}
       </p>
     </>
   );

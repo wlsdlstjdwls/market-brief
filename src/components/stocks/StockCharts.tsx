@@ -16,7 +16,7 @@
 import { useState } from "react";
 import { BarChart, LineChart } from "./Charts";
 import type { Stock } from "../../lib/stocks";
-import { indexLabel, isUsd, unitOf } from "../../lib/stock-format";
+import { fmtAmt, indexLabel, isUsd } from "../../lib/stock-format";
 
 const NF0 = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 });
 const NF1 = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 1 });
@@ -24,7 +24,6 @@ const NF2 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
 const won = (v: number) => NF0.format(v);
 const usdFmt = (v: number) => `$${v < 100 ? NF2.format(v) : NF0.format(v)}`;
-const eok = (v: number) => NF0.format(v);
 const pct = (v: number) => `${NF1.format(v)}%`;
 const mult = (v: number) => `${NF1.format(v)}배`;
 const toEok = (v: number | null) => (v === null ? null : v / 1e8);
@@ -34,7 +33,8 @@ export default function StockCharts({ stock: s }: { stock: Stock }) {
   // 분기 재무가 없고 연간만 있는 종목(TSMC처럼 SEC에 연간 보고서만 내는 외국 기업)은 연간부터 연다
   const [period, setPeriod] = useState<"Q" | "Y">(s.quarters.length ? "Q" : "Y");
   const usd = isUsd(s.cur);
-  const unit = unitOf(s.cur);
+  // 막대 값은 억 단위로 넘기고, 축과 툴팁에는 단위째 적는다(`1.2조`, `3,000억`)
+  const eok = (v: number) => fmtAmt(v * 1e8, s.cur);
   // 앤트로픽처럼 상장 직후라 재무가 아예 없으면 재무 차트를 그리지 않는다
   const hasFin = s.quarters.length > 0 || s.annual.length > 0;
   const P = period === "Q" ? s.quarters : s.annual;
@@ -91,7 +91,7 @@ export default function StockCharts({ stock: s }: { stock: Stock }) {
       <div className="sc-grid">
         <figure className="sc-fig">
           <figcaption>
-            매출, 영업이익 <small>{unit}</small>
+            매출, 영업이익
           </figcaption>
           <BarChart
             labels={pLabels}
@@ -142,7 +142,7 @@ export default function StockCharts({ stock: s }: { stock: Stock }) {
         {cf.length ? (
           <figure className="sc-fig">
             <figcaption>
-              현금흐름 <small>연간, {unit}</small>
+              현금흐름 <small>연간</small>
             </figcaption>
             <BarChart
               labels={cf.map((c) => c.key)}
@@ -158,7 +158,7 @@ export default function StockCharts({ stock: s }: { stock: Stock }) {
         {flows.length ? (
           <figure className="sc-fig">
             <figcaption>
-              외국인, 기관 순매수 <small>일별, 억원, 최근 60거래일</small>
+              외국인, 기관 순매수 <small>일별, 최근 60거래일</small>
             </figcaption>
             <BarChart
               labels={flows.map((f) => dot(f.d))}

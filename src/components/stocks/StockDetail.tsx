@@ -13,7 +13,7 @@ import {
 import {
   fmtChange,
   fmtDelta,
-  fmtEok,
+  fmtAmt,
   fmtInt,
   fmtMoney,
   fmtMultiple,
@@ -23,7 +23,6 @@ import {
   fsLabel,
   isUsd,
   toneOf,
-  unitOf,
 } from "../../lib/stock-format";
 
 /**
@@ -41,8 +40,10 @@ function PeriodTable({
   roeLabel,
   qoq,
   uid,
+  cur,
 }: {
   rows: Array<{ key: string } & StockPeriod>;
+  cur: Stock["cur"];
   roeLabel: string;
   /** 분기 표만 직전 분기 대비 열을 둔다. 연간에는 그 값이 없다 */
   qoq: boolean;
@@ -78,9 +79,9 @@ function PeriodTable({
           {[...rows].reverse().map((r) => (
             <tr key={r.key}>
               <th scope="row">{r.key}</th>
-              <td className="num">{fmtEok(r.rev)}</td>
-              <td className={`num ${r.op !== null && r.op < 0 ? "down" : ""}`}>{fmtEok(r.op)}</td>
-              <td className={`num ${r.ni !== null && r.ni < 0 ? "down" : ""}`}>{fmtEok(r.ni)}</td>
+              <td className="num">{fmtAmt(r.rev, cur)}</td>
+              <td className={`num ${r.op !== null && r.op < 0 ? "down" : ""}`}>{fmtAmt(r.op, cur)}</td>
+              <td className={`num ${r.ni !== null && r.ni < 0 ? "down" : ""}`}>{fmtAmt(r.ni, cur)}</td>
               <td className="num">{fmtRatio(r.opm)}</td>
               <td className={`num ${toneOf(r.rev_yoy)}`}>{fmtChange(r.rev_yoy)}</td>
               {qoq ? (
@@ -101,7 +102,7 @@ function PeriodTable({
 }
 
 function fmtValue(row: CompareRow, v: number | null, cur: Stock["cur"]): string {
-  if (row.kind === "eok") return fmtEok(v);
+  if (row.kind === "eok") return fmtAmt(v, cur);
   if (row.kind === "ratio") return fmtRatio(v);
   if (row.kind === "won") return fmtPriceNum(v, cur);
   return fmtMultiple(v, row.label === "PBR" ? 2 : 1);
@@ -148,7 +149,7 @@ function CompareTable({ stock }: { stock: Stock }) {
         </table>
       </div>
       <p className="stk-note">
-        재무는 {lastQ ?? "최근 분기"}를 직전 분기, 전년 같은 분기와 비교했습니다({unitOf(stock.cur)}). 주가,
+        재무는 {lastQ ?? "최근 분기"}를 직전 분기, 전년 같은 분기와 비교했습니다. 주가,
         PER, PBR은 13주 전, 52주 전 주봉과 비교했습니다. 비율 지표의 변화는 %p, 나머지는 %입니다.
         기준 값이 0 이하(적자)면 증감률을 계산하지 않습니다.
       </p>
@@ -218,9 +219,9 @@ export default function StockDetail({
           },
           {
             label: "외국인 20일",
-            value: n.frgn_20 === null ? "-" : `${fmtEok(n.frgn_20)}억`,
+            value: fmtAmt(n.frgn_20, s.cur),
             tone: toneOf(n.frgn_20),
-            sub: <span>기관 {n.organ_20 === null ? "-" : `${fmtEok(n.organ_20)}억`}</span>,
+            sub: <span>기관 {fmtAmt(n.organ_20, s.cur)}</span>,
           },
         ]),
     {
@@ -393,20 +394,20 @@ export default function StockDetail({
       <section className="sec">
         <div className="sec-gutter">
           <p className="sec-label">분기 실적</p>
-          <p className="sec-note">{unitOf(s.cur)}, 최근 12분기{usd ? ", 달력 분기 기준" : ""}</p>
+          <p className="sec-note">최근 12분기{usd ? ", 달력 분기 기준" : ""}</p>
         </div>
         <div className="sec-body">
-          <PeriodTable rows={s.quarters} roeLabel="ROE (TTM)" qoq uid="q" />
+          <PeriodTable rows={s.quarters} roeLabel="ROE (TTM)" qoq uid="q" cur={s.cur} />
         </div>
       </section>
 
       <section className="sec">
         <div className="sec-gutter">
           <p className="sec-label">연간 실적</p>
-          <p className="sec-note">{unitOf(s.cur)}, 최근 5년</p>
+          <p className="sec-note">최근 5년</p>
         </div>
         <div className="sec-body">
-          <PeriodTable rows={s.annual} roeLabel="ROE" qoq={false} uid="a" />
+          <PeriodTable rows={s.annual} roeLabel="ROE" qoq={false} uid="a" cur={s.cur} />
         </div>
       </section>
 
@@ -460,7 +461,7 @@ function Range52({
   );
 }
 
-const eokOr = (v: number | null | undefined) => (v === null || v === undefined ? "-" : `${fmtEok(v)}억`);
+const eokOr = (v: number | null | undefined) => fmtAmt(v, "KRW");
 
 function FlowSummary({ s }: { s: Stock }) {
   const f = s.flowSum;

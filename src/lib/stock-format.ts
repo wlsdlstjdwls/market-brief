@@ -64,9 +64,29 @@ export const isUsd = (cur: Cur): boolean => cur === "USD";
 /** 금액 단위. 계산은 둘 다 1e8로 나눈다(억원, 억달러) */
 export const unitOf = (cur: Cur): string => (isUsd(cur) ? "억달러" : "억원");
 
-/** 금액 + 짧은 단위 (`1,234억`, `1,234억달러`) */
-export const fmtMoney = (v: number | null | undefined, cur: Cur): string =>
-  v === null || v === undefined ? DASH : `${fmtEok(v)}${isUsd(cur) ? "억달러" : "억"}`;
+const NF_UP2 = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 2 });
+const NF_UP1 = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 1 });
+
+/**
+ * 금액을 단위째 적는다 (2026-11-23 사용자 지적, "금액 단위가 안 나와 보기 힘들다").
+ * 표 칸마다 `1.28조`, `3,456억`, `820만`처럼 크기에 맞는 단위를 붙인다. 해외는 뒤에 `달러`.
+ * 1조 이상은 소수 둘째 자리(10조 이상은 첫째), 1억 이상은 억 단위 정수다.
+ */
+export function fmtAmt(v: number | null | undefined, cur: Cur): string {
+  if (v === null || v === undefined || !Number.isFinite(v)) return DASH;
+  const a = Math.abs(v);
+  const sign = v < 0 ? "-" : "";
+  let s: string;
+  if (a >= 1e12) s = `${(a >= 1e13 ? NF_UP1 : NF_UP2).format(a / 1e12)}조`;
+  else if (a >= 1e8) s = `${NF0.format(Math.round(a / 1e8))}억`;
+  else if (a >= 1e4) s = `${NF0.format(Math.round(a / 1e4))}만`;
+  else s = NF0.format(a);
+  if (s === "0억" || s === "0만" || s === "0") return "0";
+  return `${sign}${s}${isUsd(cur) ? "달러" : ""}`;
+}
+
+/** 금액 + 단위. `fmtAmt`와 같다(옛 이름) */
+export const fmtMoney = fmtAmt;
 
 /** 주가 숫자만 (`16,730`, `127.95`) */
 export const fmtPriceNum = (v: number | null | undefined, cur: Cur): string =>
