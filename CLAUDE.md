@@ -775,7 +775,11 @@ secret이 없으면 스크립트가 조용히 끝낸다(exit 0).
   (2026-11-23 첫 수동 실행에서 실패). repository secret `SEC_USER_AGENT`(예: `thebriefing.kr market-brief 주소@도메인`)로
   넣는다. 코드에는 주소를 박지 않는다. secret이 없으면 해외 수집 step이 실패하고, 그 주에 국내 회차가 새로 적재됐으면
   해외 줄이 비어 버린다.
-- 평일 공시 갱신(`daily-stocks.yml`)은 해외를 건드리지 않는다(DART 고유번호가 없어 건너뛴다). 해외는 토요일에만 갈린다.
+- **해외 평일 갱신**(2026-11-23 사용자 지시, `daily-global.yml`). 화~토 08:00 KST(미국장 마감 뒤),
+  Vercel cron `0 23 * * 1-5` → `/api/cron/stocks?mode=global`. 국내 평일 갱신과 같은 길이다 —
+  `fin-daily-targets.ts ... USD` → `fin_global.py --targets`(회차 날짜 이후 8-K Item 2.02, 10-Q/10-K/20-F 중
+  안 본 접수번호) → 바뀐 종목만 다시 수집 → `patch-fin.ts`. SEC 접수번호는 `rcpNoOf`가 주소 경로에서 뽑는다.
+  국내 평일 갱신은 `... KRW`로 국내만 본다. 국내 시각(21:00)에 돌리면 미국 공시가 하루 늦어서 시각을 갈랐다.
 
 ### 유료 전환 시 주의
 

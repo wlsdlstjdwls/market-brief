@@ -2,7 +2,7 @@
  * 평일 공시 확인의 대상 목록. 최신 회차의 종목과, 종목마다 이미 본 공시 접수번호를 꺼낸다.
  * `fin_daily.py`가 읽는다. DB를 읽기만 한다.
  *
- *   npx tsx --env-file=.env.local scripts/fin-daily-targets.ts out/targets.json
+ *   npx tsx --env-file=.env.local scripts/fin-daily-targets.ts out/targets.json [KRW|USD]
  */
 import { writeFileSync } from "node:fs";
 import { sql } from "drizzle-orm";
@@ -24,7 +24,12 @@ async function main() {
       SELECT code, name, group_name, detail FROM fin_stock
       WHERE run_date = ${run.run_date} ORDER BY ord`),
   );
-  const stocks = rows.map((r) => ({
+  // 3번째 인자로 국내(KRW) / 해외(USD)를 가른다. 국내는 DART, 해외는 SEC로 확인하므로 서로 넘기지 않는다
+  const region = process.argv[3];
+  const picked = region
+    ? rows.filter((r) => (r.detail.cur === "USD" ? "USD" : "KRW") === region)
+    : rows;
+  const stocks = picked.map((r) => ({
     code: r.code,
     name: r.name,
     group: r.group_name,

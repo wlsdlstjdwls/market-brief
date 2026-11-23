@@ -148,6 +148,10 @@ const DART = (n: string) => `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${n}`;
 test("공시 주소에서 접수번호를 뽑는다", () => {
   assert.equal(rcpNoOf(DART("20261112900396")), "20261112900396");
   assert.equal(rcpNoOf("https://example.com/x"), null);
+  assert.equal(
+    rcpNoOf("https://www.sec.gov/Archives/edgar/data/1045810/000104581026000123/nvda-8k.htm"),
+    "000104581026000123",
+  );
 });
 
 test("이미 본 공시는 저장된 목록과 지난 갱신 기록을 합친다", () => {

@@ -155,7 +155,10 @@ export type StockPatch = { on: string; titles: string[]; seen: string[] };
 /** DART 공시 주소의 접수번호(`rcpNo=20261112900396`) */
 export function rcpNoOf(url: string): string | null {
   const m = url.match(/rcpNo=(\d{14})/);
-  return m ? m[1] : null;
+  if (m) return m[1];
+  // SEC 공시는 접수번호(accession, 하이픈 뺀 18자리)가 주소 경로에 있다 (2026-11-23 해외 종목)
+  const s = url.match(/sec\.gov\/Archives\/edgar\/data\/\d+\/(\d{18})\//);
+  return s ? s[1] : null;
 }
 
 /**

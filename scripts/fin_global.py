@@ -292,17 +292,84 @@ def price_asof(meta, now):
     return f"{now:%H:%M} 장중"
 
 
+PERIODIC = ("10-Q", "10-K", "20-F", "40-F")
+
+
+def new_filings(cik, since, known):
+    """회차 날짜 이후 숫자가 바뀌는 공시: 실적 발표(8-K Item 2.02), 정기보고서. (새 것 제목, 본 번호 전부)
+    `known`에 없는 접수번호만 새 것으로 친다 — 같은 공시로 다음 날 또 다시 수집하지 않는다."""
+    r = get(f"https://data.sec.gov/submissions/CIK{cik:010d}.json")["filings"]["recent"]
+    fresh, seen = [], []
+    for form, day, acc, items in zip(r["form"], r["filingDate"], r["accessionNumber"],
+                                     r.get("items", [""] * len(r["form"]))):
+        if day < since:
+            continue
+        if form in PERIODIC:
+            title = f"{form} 정기보고서"
+        elif form == "8-K" and "2.02" in (items or ""):
+            title = "8-K 실적 발표"
+        else:
+            continue
+        no = acc.replace("-", "")
+        seen.append(no)
+        if no not in known:
+            fresh.append(title)
+    return fresh, seen
+
+
+def check_targets(targets, tickers, today):
+    """평일 갱신 (2026-11-23 사용자 지시, "해외도 국내처럼 매일"). `fin_daily.py`와 같은 changes 모양을 만든다."""
+    run_date = targets["runDate"]
+    changed = []
+    if today.isoformat() <= run_date:
+        print(f"오늘({today})이 회차({run_date}) 이후가 아니다. 확인할 것이 없다.")
+        return changed
+    for s in targets["stocks"]:
+        cik = tickers.get(s["code"])
+        if not cik:
+            print(f"  {s['name']}: SEC 등록번호 없음, 건너뜀")
+            continue
+        try:
+            fresh, seen = new_filings(cik, run_date, set(s.get("known", [])))
+        except Exception as e:
+            print(f"  {s['name']}: 공시 확인 실패 {type(e).__name__}, 내일 다시 본다")
+            continue
+        if fresh:
+            print(f"  {s['name']}: 새 공시 {len(fresh)}건 — {', '.join(fresh)}")
+            changed.append(dict(code=s["code"], name=s["name"], group=s["group"], titles=fresh, seen=seen))
+        time.sleep(0.15)  # SEC 한도(초당 10회) 아래로
+    print(f"{len(targets['stocks'])}종목 확인, 새 공시 {len(changed)}종목")
+    return changed
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--fin-trend", required=True)
     ap.add_argument("--watchlist", default=os.path.join(HERE, "..", "data", "global-watchlist.json"))
     ap.add_argument("--out", required=True)
+    ap.add_argument("--targets", help="평일 갱신: fin-daily-targets.ts USD 출력. 새 공시가 있는 종목만 다시 수집")
+    ap.add_argument("--today", help="YYYY-MM-DD (평일 갱신 기준일, 기본 오늘 KST)")
     a = ap.parse_args()
     ft = load_fin_trend(a.fin_trend)
     now = dt.datetime.now(KST)
-    today = now.date()
+    today = dt.date.fromisoformat(a.today) if a.today else now.date()
     wl = json.load(open(a.watchlist, encoding="utf-8"))
     tickers = {v["ticker"]: v["cik_str"] for v in get("https://www.sec.gov/files/company_tickers.json").values()}
+
+    if a.targets:
+        # 결과 모양은 fin_daily.py와 같다: out/changes.json + out/run/data.json → patch-fin.ts가 적재한다
+        t = json.load(open(a.targets, encoding="utf-8"))
+        changed = check_targets(t, tickers, today)
+        os.makedirs(a.out, exist_ok=True)
+        json.dump(dict(on=today.isoformat(), checked=len(t["stocks"]), changed=changed),
+                  open(os.path.join(a.out, "changes.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+        if not changed:
+            return
+        by_tk = {it["ticker"]: it for it in wl}
+        # ADR 비율은 목록 파일에서, 그룹, 이름은 회차 것(patch-fin이 회차 그룹을 지킨다)
+        wl = [dict(by_tk.get(c["code"], {}), ticker=c["code"], name=c["name"], group=c["group"]) for c in changed]
+        a.out = os.path.join(a.out, "run")
+
     idx = {m: chart(sym)[0] for m, sym in INDEX.items()}
     last_fy = str(today.year - 1)
 

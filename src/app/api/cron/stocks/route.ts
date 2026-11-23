@@ -22,6 +22,7 @@ export const dynamic = "force-dynamic";
 
 const WORKFLOW = "weekly-stocks.yml";
 const DAILY_WORKFLOW = "daily-stocks.yml";
+const GLOBAL_WORKFLOW = "daily-global.yml";
 const REPO = process.env.GH_REPO ?? "wlsdlstjdwls/market-brief";
 
 function kstToday(): string {
@@ -59,8 +60,10 @@ export async function GET(req: Request) {
   const q = url.searchParams.get("date");
   const date = q && /^\d{4}-\d{2}-\d{2}$/.test(q) ? q : kstToday();
 
-  const daily = url.searchParams.get("mode") === "daily";
-  const workflow = daily ? DAILY_WORKFLOW : WORKFLOW;
+  // `?mode=global`은 해외 평일 갱신(2026-11-23, 화~토 08:00 KST, 미국장 마감 뒤)이다. 입력 모양은 daily와 같다
+  const mode = url.searchParams.get("mode");
+  const daily = mode === "daily" || mode === "global";
+  const workflow = mode === "global" ? GLOBAL_WORKFLOW : daily ? DAILY_WORKFLOW : WORKFLOW;
 
   if (!daily && (await alreadyLoaded(date))) {
     return Response.json({ ok: true, skipped: "already-loaded", date });
