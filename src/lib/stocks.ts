@@ -88,10 +88,18 @@ export type StockSnap = {
 /** 공시 한 건. 분류(cat)는 원천이 정한 값 그대로 */
 export type Disclosure = { d: string; cat: string; title: string; url: string };
 
+/**
+ * 통화. 국내는 원, 해외(2026-11-23 추가)는 달러다. 금액 필드는 전부 이 통화 그대로이고 화면이
+ * 억원 / 억달러로 바꾼다. 둘을 한 숫자로 더하거나 정렬하지 않는다 — 목록이 국내, 해외를 갈라 보인다.
+ */
+export type Currency = "KRW" | "USD";
+
 export type Stock = {
   sector: string;
   name: string;
+  /** 국내는 6자리 종목코드, 해외는 티커(`NVDA`) */
   code: string;
+  cur: Currency;
   /** CFS 연결 / OFS 별도 */
   fs: string;
   snap: StockSnap;
@@ -194,7 +202,11 @@ const obj = (v: unknown): Record<string, unknown> | null =>
 const arr = (v: unknown): Array<Record<string, unknown>> =>
   Array.isArray(v) ? v.filter((x): x is Record<string, unknown> => !!obj(x)) : [];
 
-const DART_RE = /^https:\/\/dart\.fss\.or\.kr\//;
+/** 공시 링크는 DART와 SEC 원문만 받는다 */
+const DISC_RE = /^https:\/\/(dart\.fss\.or\.kr|www\.sec\.gov)\//;
+
+/** 국내 6자리 종목코드 또는 해외 티커 */
+const CODE_RE = /^([0-9A-Z]{6}|[A-Z]{1,5})$/;
 
 function period(key: string, raw: Record<string, unknown>): { key: string } & StockPeriod {
   return {
@@ -236,7 +248,7 @@ export function trimData(raw: unknown): StockWeekData {
     const code = str(s.code);
     const snapRaw = s.snap as Record<string, unknown> | undefined;
     // 수집에 실패한 종목은 snap이 없다. 빈 줄로 올리지 않고 뺀다(_수집로그.md에 남는다).
-    if (!name || !code || !/^[0-9A-Z]{6}$/.test(code) || !snapRaw) continue;
+    if (!name || !code || !CODE_RE.test(code) || !snapRaw) continue;
 
     const quarters = periods(s.quarters);
     const lastQ = str(snapRaw.last_q);
@@ -246,6 +258,7 @@ export function trimData(raw: unknown): StockWeekData {
       sector: str(s.sector) ?? "기타",
       name,
       code,
+      cur: s.cur === "USD" ? "USD" : "KRW",
       fs: str(s.fs) ?? "CFS",
       snap: {
         price: num(snapRaw.price),
@@ -337,8 +350,8 @@ export function trimData(raw: unknown): StockWeekData {
           title: str(x.title) ?? "",
           url: str(x.url) ?? "",
         }))
-        // 정기보고서는 분기마다 같은 제목이라 뺀다(연동 문서 4.2). 링크는 DART 주소만 받는다
-        .filter((x) => x.d && x.title && x.cat !== "정기보고서" && DART_RE.test(x.url)),
+        // 정기보고서는 분기마다 같은 제목이라 뺀다(연동 문서 4.2). 링크는 DART, SEC 주소만 받는다
+        .filter((x) => x.d && x.title && x.cat !== "정기보고서" && DISC_RE.test(x.url)),
       sched: (() => {
         const o = obj(s.sched);
         return o
@@ -531,6 +544,7 @@ export function compareRows(s: Stock): { lastQ: string | null; rows: CompareRow[
 export type StockCard = {
   code: string;
   name: string;
+  cur: Currency;
   sector: string;
   market: string | null;
   price: number | null;
@@ -579,6 +593,7 @@ export function toCard(s: Stock): StockCard {
   return {
     code: s.code,
     name: s.name,
+    cur: s.cur ?? "KRW",
     sector: s.sector,
     market: s.market,
     price: n.price,

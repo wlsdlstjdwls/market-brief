@@ -21,7 +21,8 @@ export async function generateStaticParams() {
   }
 }
 
-const CODE_RE = /^[0-9A-Z]{6}$/;
+/** 국내 6자리 종목코드 또는 해외 티커(2026-11-23) */
+const CODE_RE = /^([0-9A-Z]{6}|[A-Z]{1,5})$/;
 
 export default async function StockModalPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;

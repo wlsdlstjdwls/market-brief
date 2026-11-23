@@ -15,10 +15,15 @@ import {
   fmtDelta,
   fmtEok,
   fmtInt,
+  fmtMoney,
   fmtMultiple,
+  fmtPrice,
+  fmtPriceNum,
   fmtRatio,
   fsLabel,
+  isUsd,
   toneOf,
+  unitOf,
 } from "../../lib/stock-format";
 
 /**
@@ -95,10 +100,10 @@ function PeriodTable({
   );
 }
 
-function fmtValue(row: CompareRow, v: number | null): string {
+function fmtValue(row: CompareRow, v: number | null, cur: Stock["cur"]): string {
   if (row.kind === "eok") return fmtEok(v);
   if (row.kind === "ratio") return fmtRatio(v);
-  if (row.kind === "won") return fmtInt(v);
+  if (row.kind === "won") return fmtPriceNum(v, cur);
   return fmtMultiple(v, row.label === "PBR" ? 2 : 1);
 }
 
@@ -131,10 +136,10 @@ function CompareTable({ stock }: { stock: Stock }) {
                   <th scope="row">
                     <Term label={r.label} uid={`c-${r.label}`} />
                   </th>
-                  <td className="num">{fmtValue(r, r.now)}</td>
-                  <td className="num faint">{fmtValue(r, r.prev)}</td>
+                  <td className="num">{fmtValue(r, r.now, stock.cur)}</td>
+                  <td className="num faint">{fmtValue(r, r.prev, stock.cur)}</td>
                   <td className={`num ${toneOf(r.dPrev)}`}>{fmtDelta(r.dPrev, unit)}</td>
-                  <td className="num faint">{fmtValue(r, r.yearAgo)}</td>
+                  <td className="num faint">{fmtValue(r, r.yearAgo, stock.cur)}</td>
                   <td className={`num ${toneOf(r.dYear)}`}>{fmtDelta(r.dYear, unit)}</td>
                 </tr>
               );
@@ -143,7 +148,7 @@ function CompareTable({ stock }: { stock: Stock }) {
         </table>
       </div>
       <p className="stk-note">
-        재무는 {lastQ ?? "최근 분기"}를 직전 분기, 전년 같은 분기와 비교했습니다(억원). 주가,
+        재무는 {lastQ ?? "최근 분기"}를 직전 분기, 전년 같은 분기와 비교했습니다({unitOf(stock.cur)}). 주가,
         PER, PBR은 13주 전, 52주 전 주봉과 비교했습니다. 비율 지표의 변화는 %p, 나머지는 %입니다.
         기준 값이 0 이하(적자)면 증감률을 계산하지 않습니다.
       </p>
@@ -160,6 +165,8 @@ export default function StockDetail({
   inModal?: boolean;
 }) {
   const { stock: s, runAt } = hit;
+  // 해외 종목(2026-11-23)은 달러이고 외국인, 기관 수급이 없다
+  const usd = isUsd(s.cur);
   const updatedOn = s.patch?.on ?? runAt.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
   const n = s.snap;
 
@@ -197,26 +204,34 @@ export default function StockDetail({
       tone: toneOf(n.rel_3m),
       sub: <span>1년 {fmtDelta(n.rel_1y, "%p")}</span>,
     },
-    {
-      label: "외국인 지분율",
-      value: fmtRatio(n.hold_now),
-      sub: <span>60일 {fmtDelta(n.hold_chg_60, "%p")}</span>,
-    },
-    {
-      label: "외국인 20일",
-      value: n.frgn_20 === null ? "-" : `${fmtEok(n.frgn_20)}억`,
-      tone: toneOf(n.frgn_20),
-      sub: <span>기관 {n.organ_20 === null ? "-" : `${fmtEok(n.organ_20)}억`}</span>,
-    },
+    // 해외 종목에는 외국인, 기관 수급이 없다. 그 두 칸 자리에 시가총액과 52주 고가 대비를 둔다
+    ...(usd
+      ? [
+          { label: "시가총액", value: fmtMoney(n.mcap, s.cur), sub: <span>{n.date ? `${n.date.slice(2).replace(/-/g, ".")} 주가 기준` : ""}</span> },
+          { label: "고가 대비", value: fmtChange(n.from_hi), tone: toneOf(n.from_hi), sub: <span>52주 고가 {fmtPrice(n.hi52, s.cur)}</span> },
+        ]
+      : [
+          {
+            label: "외국인 지분율",
+            value: fmtRatio(n.hold_now),
+            sub: <span>60일 {fmtDelta(n.hold_chg_60, "%p")}</span>,
+          },
+          {
+            label: "외국인 20일",
+            value: n.frgn_20 === null ? "-" : `${fmtEok(n.frgn_20)}억`,
+            tone: toneOf(n.frgn_20),
+            sub: <span>기관 {n.organ_20 === null ? "-" : `${fmtEok(n.organ_20)}억`}</span>,
+          },
+        ]),
     {
       label: "영업CF/순이익",
       value: fmtRatio(n.cash_conv),
-      sub: <span>FCF {n.fcf_fy === null ? "-" : `${fmtEok(n.fcf_fy)}억`}</span>,
+      sub: <span>FCF {fmtMoney(n.fcf_fy, s.cur)}</span>,
     },
     {
       label: "배당수익률",
       value: fmtRatio(n.div_yield),
-      sub: <span>주당 {n.dps === null ? "-" : `${fmtInt(n.dps)}원`}</span>,
+      sub: <span>주당 {fmtPrice(n.dps, s.cur)}</span>,
     },
     {
       label: "다음 실적 예상",
@@ -245,7 +260,7 @@ export default function StockDetail({
           <span className="masthead-meta">{s.code}</span>
         </div>
         <div className="sd-price">
-          <b>{n.price === null ? "-" : `${fmtInt(n.price)}원`}</b>
+          <b>{fmtPrice(n.price, s.cur)}</b>
           {/* 장중에 돌린 회차면 확정 종가가 아니다. 그 시점을 주가 바로 옆에 적는다 */}
           {n.asof ? <span className="sd-asof">({n.asof})</span> : null}
           <ul>
@@ -257,7 +272,7 @@ export default function StockDetail({
             ))}
           </ul>
         </div>
-        <Range52 lo={n.lo52} hi={n.hi52} pos={n.pos52} fromHi={n.from_hi} />
+        <Range52 lo={n.lo52} hi={n.hi52} pos={n.pos52} fromHi={n.from_hi} cur={s.cur} />
         <p className="edition">
           <span>{fsLabel(s.fs)} 재무제표</span>
           {/* 재무와 주가의 기준일이 다르다. 둘 다 적는다(연동 문서 5장) */}
@@ -273,7 +288,19 @@ export default function StockDetail({
           {/* 이 종목 숫자를 마지막으로 받은 날. 평일 공시 갱신이 있었으면 그날이다(2026-11-19 사용자 지시, 날짜만) */}
           {updatedOn ? <span className="sd-updated">{updatedOn.replace(/-/g, ".")} 갱신</span> : null}
         </p>
-        {pending ? (
+        {pending && usd ? (
+          <p className="sd-pending">
+            <b>
+              {pending.d.replace(/-/g, ".")}에 {pending.quarter.slice(0, 4)}년 {pending.quarter.slice(-1)}분기
+              실적 발표(8-K)가 나왔습니다.
+            </b>{" "}
+            아래 재무 숫자는 아직 {n.last_q} 기준입니다. 분기 숫자는 분기보고서(10-Q)에서 받아 오므로 보고서가
+            제출된 뒤 수집에 반영됩니다.{" "}
+            <a href={pending.url} target="_blank" rel="noopener noreferrer">
+              실적 발표 보기
+            </a>
+          </p>
+        ) : pending ? (
           <p className="sd-pending">
             <b>
               {pending.d.replace(/-/g, ".")}에 {pending.quarter.slice(0, 4)}년 {pending.quarter.slice(-1)}분기
@@ -318,11 +345,11 @@ export default function StockDetail({
 
       <section className="sec sec--first sd-after">
         <div className="sec-gutter">
-          <p className="sec-label">수급, 배당, 일정</p>
+          <p className="sec-label">{usd ? "배당, 일정" : "수급, 배당, 일정"}</p>
           <p className="sec-note">요약</p>
         </div>
         <div className="sec-body sd-mini-grid">
-          <FlowSummary s={s} />
+          {usd ? null : <FlowSummary s={s} />}
           <DivSummary s={s} />
           <SchedSummary s={s} />
         </div>
@@ -356,7 +383,9 @@ export default function StockDetail({
                 </li>
               ))}
             </ul>
-            <p className="stk-note">제목을 누르면 DART 원문으로 갑니다.</p>
+            <p className="stk-note">
+              {usd ? "제목을 누르면 SEC 원문(영문)으로 갑니다." : "제목을 누르면 DART 원문으로 갑니다."}
+            </p>
           </div>
         </section>
       ) : null}
@@ -364,7 +393,7 @@ export default function StockDetail({
       <section className="sec">
         <div className="sec-gutter">
           <p className="sec-label">분기 실적</p>
-          <p className="sec-note">억원, 최근 12분기</p>
+          <p className="sec-note">{unitOf(s.cur)}, 최근 12분기{usd ? ", 달력 분기 기준" : ""}</p>
         </div>
         <div className="sec-body">
           <PeriodTable rows={s.quarters} roeLabel="ROE (TTM)" qoq uid="q" />
@@ -374,7 +403,7 @@ export default function StockDetail({
       <section className="sec">
         <div className="sec-gutter">
           <p className="sec-label">연간 실적</p>
-          <p className="sec-note">억원, 최근 5년</p>
+          <p className="sec-note">{unitOf(s.cur)}, 최근 5년</p>
         </div>
         <div className="sec-body">
           <PeriodTable rows={s.annual} roeLabel="ROE" qoq={false} uid="a" />
@@ -403,11 +432,13 @@ function Range52({
   hi,
   pos,
   fromHi,
+  cur,
 }: {
   lo: number | null;
   hi: number | null;
   pos: number | null;
   fromHi: number | null;
+  cur: Stock["cur"];
 }) {
   if (lo === null || hi === null || pos === null) return null;
   const p = Math.max(0, Math.min(100, pos));
@@ -415,14 +446,14 @@ function Range52({
     <div className="sd-range" aria-label={`52주 범위에서 ${Math.round(p)} 위치`}>
       <span className="sd-range-end">
         <Term label="52주 위치" uid="range52" />
-        <b>{fmtInt(lo)}</b>
+        <b>{fmtPriceNum(lo, cur)}</b>
       </span>
       <span className="sd-range-track">
         <span className="sd-range-fill" style={{ width: `${p}%` }} />
         <span className="sd-range-dot" style={{ left: `${p}%` }} />
       </span>
       <span className="sd-range-end sd-range-end--hi">
-        <b>{fmtInt(hi)}</b>
+        <b>{fmtPriceNum(hi, cur)}</b>
         <span>고가 대비 {fmtChange(fromHi)}</span>
       </span>
     </div>
@@ -494,7 +525,7 @@ function DivSummary({ s }: { s: Stock }) {
               {d.dps.map((v, i) => (
                 <tr key={i}>
                   <th scope="row">{d.year - i}</th>
-                  <td className="num">{v === null ? "-" : `${fmtInt(v)}원`}</td>
+                  <td className="num">{fmtPrice(v, s.cur)}</td>
                   <td className="num">{fmtRatio(d.yield[i] ?? null)}</td>
                   <td className="num">{fmtRatio(d.payout[i] ?? null)}</td>
                 </tr>

@@ -52,3 +52,34 @@ export function fmtDelta(v: number | null | undefined, unit: "%" | "%p" = "%"): 
   if (Math.abs(v) < 0.05) return `0.0${unit}`;
   return `${v > 0 ? "▲" : "▼"} ${NF1.format(Math.abs(v))}${unit}`;
 }
+
+/* ---------- 통화 (2026-11-23, 해외 종목 추가) ---------- */
+
+type Cur = "KRW" | "USD" | null | undefined;
+const USD2 = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** 해외 종목인가. 옛 적재분(국내)에는 통화 필드가 없다 — 없으면 원이다 */
+export const isUsd = (cur: Cur): boolean => cur === "USD";
+
+/** 금액 단위. 계산은 둘 다 1e8로 나눈다(억원, 억달러) */
+export const unitOf = (cur: Cur): string => (isUsd(cur) ? "억달러" : "억원");
+
+/** 금액 + 짧은 단위 (`1,234억`, `1,234억달러`) */
+export const fmtMoney = (v: number | null | undefined, cur: Cur): string =>
+  v === null || v === undefined ? DASH : `${fmtEok(v)}${isUsd(cur) ? "억달러" : "억"}`;
+
+/** 주가 숫자만 (`16,730`, `127.95`) */
+export const fmtPriceNum = (v: number | null | undefined, cur: Cur): string =>
+  v === null || v === undefined ? DASH : isUsd(cur) ? USD2.format(v) : NF0.format(v);
+
+/** 주가 + 통화 (`16,730원`, `$127.95`) */
+export const fmtPrice = (v: number | null | undefined, cur: Cur): string =>
+  v === null || v === undefined ? DASH : isUsd(cur) ? `$${USD2.format(v)}` : `${NF0.format(v)}원`;
+
+/** 1년 성과 비교선의 지수 이름 */
+export function indexLabel(market: string | null | undefined): string {
+  if (market === "코스닥") return "코스닥 지수";
+  if (market === "나스닥") return "나스닥 종합";
+  if (market === "NYSE") return "S&P 500";
+  return "코스피 지수";
+}

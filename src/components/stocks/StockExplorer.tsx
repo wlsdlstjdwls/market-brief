@@ -20,8 +20,12 @@ import {
   fmtEok,
   fmtInt,
   fmtMultiple,
+  fmtPrice,
+  fmtPriceNum,
   fmtRatio,
+  isUsd,
   toneOf,
+  unitOf,
 } from "../../lib/stock-format";
 import { PER_DISTORTED, type StockCard } from "../../lib/stocks";
 
@@ -92,8 +96,8 @@ const VIEWS: Array<[View, string]> = [
 ];
 
 export default function StockExplorer({
-  items,
-  sectors,
+  items: all,
+  sectors: allSectors,
 }: {
   items: StockCard[];
   sectors: string[];
@@ -105,6 +109,22 @@ export default function StockExplorer({
   // 큰 값부터가 기본. 머리글을 한 번 더 누르면 뒤집힌다
   const [dir, setDir] = useState<1 | -1>(-1);
   const [view, setView] = useState<View>("card");
+  /**
+   * 국내 / 해외 (2026-11-23 해외 종목 추가). 통화가 달라 한 목록에서 시총, 금액을 같이 정렬하거나
+   * 요약 숫자를 섞으면 안 된다. 그래서 필터가 아니라 목록 자체를 가른다. 기본은 국내다.
+   */
+  const hasUsd = useMemo(() => all.some((i) => isUsd(i.cur)), [all]);
+  const hasKrw = useMemo(() => all.some((i) => !isUsd(i.cur)), [all]);
+  const [region, setRegion] = useState<"KRW" | "USD">(hasKrw ? "KRW" : "USD");
+  const items = useMemo(
+    () => all.filter((i) => (region === "USD") === isUsd(i.cur)),
+    [all, region],
+  );
+  const sectors = useMemo(
+    () => allSectors.filter((sec) => items.some((i) => i.sector === sec)),
+    [allSectors, items],
+  );
+  const usd = region === "USD";
 
   const markets = useMemo(
     () => [...new Set(items.map((i) => i.market).filter((m): m is string => !!m))],
@@ -142,6 +162,31 @@ export default function StockExplorer({
   return (
     <div className="stx">
       {/* 필터는 한 줄, 그 아래 전부에 걸린다 */}
+      {hasUsd && hasKrw ? (
+        <div className="stx-view stx-region" role="group" aria-label="국내, 해외">
+          {(
+            [
+              ["KRW", "국내"],
+              ["USD", "해외"],
+            ] as const
+          ).map(([r, label]) => (
+            <button
+              key={r}
+              type="button"
+              aria-pressed={region === r}
+              onClick={() => {
+                // 그룹, 시장은 지역마다 다르다. 넘어가면 풀어 준다
+                setRegion(r);
+                setSector(null);
+                setMarket(null);
+                if (sort === "frgn20") setSort("order");
+              }}
+            >
+              {label} <em>{all.filter((i) => (r === "USD") === isUsd(i.cur)).length}</em>
+            </button>
+          ))}
+        </div>
+      ) : null}
       <div className="stx-bar" role="search">
         <input
           className="stx-search"
@@ -190,7 +235,8 @@ export default function StockExplorer({
             value={sort}
             // 기본값이라 채우지 않는다. 정렬은 걸러 내는 게 아니다
             neutral
-            options={SORTS.map(([k, label]) => ({ value: k, label }))}
+            // 해외 종목에는 외국인 수급이 없다
+            options={SORTS.filter(([k]) => !(usd && k === "frgn20")).map(([k, label]) => ({ value: k, label }))}
             // 표 머리글로 고른 정렬은 목록에 없다
             fallback="표 머리글 기준"
             onChange={(k) => {
@@ -221,7 +267,7 @@ export default function StockExplorer({
           {view === "card" ? (
             <Cards items={shown} />
           ) : (
-            <Table items={shown} view={view} sort={sort} dir={dir} onSort={onSort} />
+            <Table items={shown} view={view} sort={sort} dir={dir} onSort={onSort} usd={usd} />
           )}
         </>
       ) : (
@@ -672,7 +718,9 @@ function Cards({ items }: { items: ExplorerItem[] }) {
       {items.map((s) => {
         const tags = [...new Set(s.signals.map(tagOf).filter((t): t is string => !!t))].slice(0, 2);
         // 잠정실적이 나왔는데 숫자는 아직 이전 분기다. 카드 숫자를 오해하지 않게 맨 앞에 단다
-        const pending = s.pending ? `${qLabel(s.pending.quarter)} 잠정실적 미반영` : null;
+        const pending = s.pending
+          ? `${qLabel(s.pending.quarter)} ${isUsd(s.cur) ? "실적" : "잠정실적"} 미반영`
+          : null;
         // 평일 새 공시로 이 종목만 다시 수집했다. 다른 종목보다 숫자 기준일이 새롭다
         const patched = s.patched ? `${s.patched.on.slice(5).replace("-", ".")} 공시 반영` : null;
         return (
@@ -682,7 +730,7 @@ function Cards({ items }: { items: ExplorerItem[] }) {
               <span className="stx-card-name">{s.name}</span>
               <span className="stx-card-price">
                 <b>
-                  {fmtInt(s.price)}
+                  {isUsd(s.cur) ? fmtPrice(s.price, s.cur) : fmtInt(s.price)}
                   {s.asof ? <i className="stx-asof">{s.asof}</i> : null}
                 </b>
                 <span className={`stk-${toneOf(s.chg3m)}`}>3개월 {fmtChange(s.chg3m)}</span>
@@ -742,7 +790,7 @@ const won = (v: number | null) => (v === null ? "-" : fmtEok(v));
 const COLS: Record<Exclude<View, "card">, Col[]> = {
   fin: [
     { label: "시장", cell: (s) => s.market ?? "-", text: true },
-    { label: "시총(억)", key: "mcap", cell: (s) => fmtEok(s.mcap) },
+    { label: "시총", key: "mcap", cell: (s) => fmtEok(s.mcap) },
     { label: "분기 매출", key: "revQ", cell: (s) => won(s.revQ) },
     { label: "분기 영업이익", key: "opQ", cell: (s) => won(s.opQ), tone: (s) => (s.opQ !== null && s.opQ < 0 ? -1 : null) },
     { label: "영업이익률", key: "opm", cell: (s) => fmtRatio(s.opm) },
@@ -772,7 +820,7 @@ const COLS: Record<Exclude<View, "card">, Col[]> = {
     },
   ],
   flow: [
-    { label: "주가", key: "price", cell: (s) => fmtInt(s.price) },
+    { label: "주가", key: "price", cell: (s) => fmtPriceNum(s.price, s.cur) },
     { label: "1개월", key: "chg1m", cell: (s) => fmtChange(s.chg1m), tone: (s) => s.chg1m },
     { label: "3개월", key: "chg3m", cell: (s) => fmtChange(s.chg3m), tone: (s) => s.chg3m },
     { label: "지수 대비 3개월", key: "rel3m", cell: (s) => fmtDelta(s.rel3m, "%p"), tone: (s) => s.rel3m },
@@ -787,12 +835,15 @@ const COLS: Record<Exclude<View, "card">, Col[]> = {
     { label: "영업CF", key: "ocfFy", cell: (s) => won(s.ocfFy), tone: (s) => (s.ocfFy !== null && s.ocfFy < 0 ? -1 : null) },
     { label: "FCF", key: "fcfFy", cell: (s) => won(s.fcfFy), tone: (s) => (s.fcfFy !== null && s.fcfFy < 0 ? -1 : null) },
     { label: "영업CF/순이익", key: "cashConv", cell: (s) => fmtRatio(s.cashConv) },
-    { label: "주당배당금", key: "dps", cell: (s) => (s.dps === null ? "-" : `${fmtInt(s.dps)}원`) },
+    { label: "주당배당금", key: "dps", cell: (s) => fmtPrice(s.dps, s.cur) },
     { label: "배당수익률", key: "divYield", cell: (s) => fmtRatio(s.divYield) },
     // 추정값이라 "예상"을 붙인다(연동 문서 5장)
     { label: "다음 실적 예상", cell: (s) => (s.nextEarn ? `${s.nextEarn.replace(/-/g, ".")} 예상` : "-"), text: true },
   ],
 };
+
+/** 국내 수급(네이버 투자자별 매매동향)에서만 오는 열. 해외 목록에서는 뺀다 */
+const FLOW_ONLY_KRW = new Set(["외국인 20일", "기관 20일", "외국인 지분율", "지분율 60일 변화"]);
 
 /** 52주 저가(0)와 고가(100) 사이 위치. 숫자와 짧은 막대를 같이 */
 function Pos52({ v }: { v: number | null }) {
@@ -813,14 +864,18 @@ function Table({
   sort,
   dir,
   onSort,
+  usd,
 }: {
   items: StockCard[];
   view: Exclude<View, "card">;
   sort: SortKey;
   dir: 1 | -1;
   onSort: (k: NumKey) => void;
+  /** 해외 목록. 금액은 억달러이고 외국인, 기관 수급 열이 없다 */
+  usd: boolean;
 }) {
-  const cols = COLS[view];
+  const unit = unitOf(usd ? "USD" : "KRW");
+  const cols = COLS[view].filter((c) => !(usd && FLOW_ONLY_KRW.has(c.label)));
   return (
     <>
       <div className="stk-table">
@@ -873,10 +928,12 @@ function Table({
       </div>
       <p className="stk-note">
         {view === "fin"
-          ? `PER ${PER_DISTORTED}배 이상은 이익이 0에 가까워 생긴 왜곡이라 흐리게 표시하고 정렬에서 뒤로 보냅니다. 분기 옆 *는 다음 분기 잠정실적이 공시됐지만 분기보고서 제출 전이라 숫자에 아직 안 들어간 종목입니다.`
+          ? `금액은 ${unit}입니다. PER ${PER_DISTORTED}배 이상은 이익이 0에 가까워 생긴 왜곡이라 흐리게 표시하고 정렬에서 뒤로 보냅니다. 분기 옆 *는 다음 분기 ${usd ? "실적 발표" : "잠정실적"}가 나왔지만 분기보고서 제출 전이라 숫자에 아직 안 들어간 종목입니다.${usd ? " 해외 종목의 분기는 달력 분기로 맞췄습니다." : ""}`
           : view === "flow"
-            ? "수급 금액은 일별 순매수 수량에 종가를 곱한 근사치입니다(억원). 52주 위치는 저가 0, 고가 100입니다."
-            : "현금흐름은 직전 사업연도 기준(억원)입니다. 다음 실적일은 과거 발표 패턴으로 추정한 값이라 확정 일정이 아닙니다."}
+            ? usd
+              ? "주가는 달러입니다. 지수 대비는 나스닥 종합(NYSE 상장은 S&P 500) 기준입니다. 52주 위치는 저가 0, 고가 100입니다."
+              : "수급 금액은 일별 순매수 수량에 종가를 곱한 근사치입니다(억원). 52주 위치는 저가 0, 고가 100입니다."
+            : `현금흐름은 직전 사업연도 기준(${unit})입니다. 다음 실적일은 과거 발표 패턴으로 추정한 값이라 확정 일정이 아닙니다.`}
       </p>
     </>
   );

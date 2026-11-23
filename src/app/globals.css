@@ -3155,6 +3155,24 @@ html:not([data-session="am"]) .ses--am {
   color: var(--bg);
 }
 
+/* 국내 / 해외 전환 (2026-11-23). 검색 줄 위에 붙인다. 통화가 달라 목록 자체를 가른다 */
+.stx-region {
+  margin: 0 0 12px;
+}
+
+.stk-page .stx-region button {
+  padding: 9px 18px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.stx-region button em {
+  margin-left: 4px;
+  font-style: normal;
+  font-weight: 400;
+  opacity: 0.7;
+}
+
 /* 요약 숫자: 흰 칸 넷 */
 .stk-page .stx-stats {
   gap: 10px;

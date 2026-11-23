@@ -16,11 +16,14 @@
 import { useState } from "react";
 import { BarChart, LineChart } from "./Charts";
 import type { Stock } from "../../lib/stocks";
+import { indexLabel, isUsd, unitOf } from "../../lib/stock-format";
 
 const NF0 = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 });
 const NF1 = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 1 });
+const NF2 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
 const won = (v: number) => NF0.format(v);
+const usdFmt = (v: number) => `$${v < 100 ? NF2.format(v) : NF0.format(v)}`;
 const eok = (v: number) => NF0.format(v);
 const pct = (v: number) => `${NF1.format(v)}%`;
 const mult = (v: number) => `${NF1.format(v)}배`;
@@ -28,7 +31,12 @@ const toEok = (v: number | null) => (v === null ? null : v / 1e8);
 const dot = (d: string) => d.replace(/-/g, ".");
 
 export default function StockCharts({ stock: s }: { stock: Stock }) {
-  const [period, setPeriod] = useState<"Q" | "Y">("Q");
+  // 분기 재무가 없고 연간만 있는 종목(TSMC처럼 SEC에 연간 보고서만 내는 외국 기업)은 연간부터 연다
+  const [period, setPeriod] = useState<"Q" | "Y">(s.quarters.length ? "Q" : "Y");
+  const usd = isUsd(s.cur);
+  const unit = unitOf(s.cur);
+  // 앤트로픽처럼 상장 직후라 재무가 아예 없으면 재무 차트를 그리지 않는다
+  const hasFin = s.quarters.length > 0 || s.annual.length > 0;
   const P = period === "Q" ? s.quarters : s.annual;
   const pLabels = P.map((p) => (period === "Q" ? `${p.key.slice(2, 4)}${p.key.slice(4)}` : p.key));
   const weekly = s.weekly;
@@ -41,12 +49,12 @@ export default function StockCharts({ stock: s }: { stock: Stock }) {
     <div className="sc">
       <figure className="sc-fig">
         <figcaption>
-          주가 <small>주봉 종가, 원</small>
+          주가 <small>주봉 종가, {usd ? "달러" : "원"}</small>
         </figcaption>
         <LineChart
           labels={wLabels}
           series={[{ name: "종가", color: "--s1", values: weekly.map((w) => w.c) }]}
-          fmt={won}
+          fmt={usd ? usdFmt : won}
           height={240}
         />
       </figure>
@@ -60,7 +68,7 @@ export default function StockCharts({ stock: s }: { stock: Stock }) {
             labels={perf.map((p) => dot(p.d))}
             series={[
               { name: s.name, color: "--s1", values: perf.map((p) => p.s) },
-              { name: s.market === "코스닥" ? "코스닥 지수" : "코스피 지수", color: "--s2", values: perf.map((p) => p.i) },
+              { name: indexLabel(s.market), color: "--s2", values: perf.map((p) => p.i) },
             ]}
             fmt={(v) => NF0.format(v)}
             height={220}
@@ -68,6 +76,8 @@ export default function StockCharts({ stock: s }: { stock: Stock }) {
         </figure>
       ) : null}
 
+      {hasFin ? (
+      <>
       <div className="sc-toggle" role="group" aria-label="재무 차트 기간">
         <span>재무 차트</span>
         <button type="button" aria-pressed={period === "Q"} onClick={() => setPeriod("Q")}>
@@ -81,7 +91,7 @@ export default function StockCharts({ stock: s }: { stock: Stock }) {
       <div className="sc-grid">
         <figure className="sc-fig">
           <figcaption>
-            매출, 영업이익 <small>억원</small>
+            매출, 영업이익 <small>{unit}</small>
           </figcaption>
           <BarChart
             labels={pLabels}
@@ -132,7 +142,7 @@ export default function StockCharts({ stock: s }: { stock: Stock }) {
         {cf.length ? (
           <figure className="sc-fig">
             <figcaption>
-              현금흐름 <small>연간, 억원</small>
+              현금흐름 <small>연간, {unit}</small>
             </figcaption>
             <BarChart
               labels={cf.map((c) => c.key)}
@@ -175,8 +185,14 @@ export default function StockCharts({ stock: s }: { stock: Stock }) {
           </figure>
         ) : null}
       </div>
+      </>
+      ) : (
+        <p className="stk-note">
+          재무 자료가 아직 없습니다. 상장 직후라 정기보고서가 나오기 전이거나, SEC에 재무를 내지 않는 외국 기업입니다.
+        </p>
+      )}
       <p className="stk-note">
-        수급 금액은 일별 순매수 수량에 종가를 곱한 근사치입니다. PER, PBR 주봉 값은 그 시점에
+        {usd ? "" : "수급 금액은 일별 순매수 수량에 종가를 곱한 근사치입니다. "}PER, PBR 주봉 값은 그 시점에
         공시가 끝난 분기 기준입니다.
       </p>
     </div>

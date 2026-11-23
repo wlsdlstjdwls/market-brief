@@ -67,6 +67,32 @@ test("수집 실패 종목은 빼고 주봉은 2년치만 남긴다", () => {
   assert.throws(() => trimData({ stocks: [] }));
 });
 
+test("해외 종목은 티커 코드와 달러를 받고 SEC 공시 링크를 남긴다", () => {
+  const out = trimData({
+    run_at: "2026-11-23 15:00 KST",
+    stocks: [
+      {
+        sector: "AI 반도체", name: "엔비디아", code: "NVDA", cur: "USD", market: "나스닥",
+        snap: { price: 125.53, deficit: false },
+        disc: [
+          { d: "2026-11-19", cat: "실적", title: "8-K 실적 발표", url: "https://www.sec.gov/Archives/edgar/data/1045810/x/a.htm" },
+          { d: "2026-11-18", cat: "실적", title: "가짜", url: "https://example.com/a" },
+        ],
+      },
+      // 국내 줄은 통화가 없어도 원이다(옛 적재분)
+      { sector: "반도체", name: "가", code: "000001", snap: { price: 1, deficit: false } },
+      // 티커 모양이 아니면 버린다
+      { sector: "x", name: "나", code: "nvda", cur: "USD", snap: { price: 1, deficit: false } },
+    ],
+  });
+  assert.equal(out.stocks.length, 2);
+  const [us, kr] = out.stocks;
+  assert.equal(us.cur, "USD");
+  assert.equal(toCard(us).cur, "USD");
+  assert.deepEqual(us.disc.map((d) => d.title), ["8-K 실적 발표"]);
+  assert.equal(kr.cur, "KRW");
+});
+
 test("과거 비교는 분기 이름으로 직전 분기와 전년 동기를 찾는다", async () => {
   const { compareRows } = await import("../src/lib/stocks");
   const q = (key: string, rev: number, opm: number) => ({ key, rev, opm });

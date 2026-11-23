@@ -13,7 +13,8 @@ export const revalidate = 600;
 
 type Params = { params: Promise<{ code: string }> };
 
-const CODE_RE = /^[0-9A-Z]{6}$/;
+/** 국내 6자리 종목코드 또는 해외 티커(2026-11-23) */
+const CODE_RE = /^([0-9A-Z]{6}|[A-Z]{1,5})$/;
 
 async function find(code: string) {
   return CODE_RE.test(code) ? getStockDetail(code) : null;

@@ -51,7 +51,10 @@ jobs:
           repository: wlsdlstjdwls/stock-analysis
           ssh-key: ${{ secrets.REPORTS_SSH_KEY }}
           path: reports
-          sparse-checkout: 요약/재무
+          # fin_trend.py는 해외 수집기(fin_global.py)가 계산 함수를 불러 쓴다. 고치지 않는다
+          sparse-checkout: |
+            요약/재무
+            fin_trend.py
           sparse-checkout-cone-mode: false
 
       - name: 원본 존재 확인
@@ -87,6 +90,18 @@ jobs:
             --date "${{ steps.date.outputs.run_date }}" \
             --skip-missing | tee /tmp/ingest.txt
           { echo '```'; cat /tmp/ingest.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      # 해외 종목(2026-11-23 추가). 국내 적재가 그 회차를 통째로 갈아 끼우므로 반드시 그 뒤에 돈다.
+      # SEC EDGAR, Yahoo 시세를 받아 최신 회차 안에 해외 줄만 다시 넣는다. 키는 필요 없다.
+      - name: 해외 수집
+        if: steps.source.outputs.found == 'true'
+        run: python3 scripts/fin_global.py --fin-trend reports/fin_trend.py --out /tmp/global
+
+      - name: 해외 적재
+        if: steps.source.outputs.found == 'true'
+        run: |
+          npx tsx scripts/ingest-global.ts --dir /tmp/global | tee /tmp/global.txt
+          { echo '```'; cat /tmp/global.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
       - name: 실패 알림
         if: failure()
