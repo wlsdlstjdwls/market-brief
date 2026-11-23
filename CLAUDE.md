@@ -771,7 +771,10 @@ secret이 없으면 스크립트가 조용히 끝낸다(exit 0).
   수집 시점 환율로 달러 환산한 연간만 싣는다(`warn`에 환율이 남는다).
 - 실적 미반영 표시는 국내 로직(`pendingResults`) 그대로다. 해외는 8-K Item 2.02가 `실적`이다.
 - 공시 링크는 `www.sec.gov`도 받는다(`DISC_RE`). 종목 주소는 티커(`/stocks/NVDA`)이고 `CODE_RE`가 6자리 코드와 티커를 같이 받는다.
-- SEC는 User-Agent를 요구한다. `thebriefing.kr market-brief`로 보낸다. 개인 메일 주소를 싣지 말 것.
+- **SEC는 User-Agent에 연락처 메일을 요구한다.** 집 PC에서는 없어도 받아 주지만 **GitHub 러너에서는 403**이다
+  (2026-11-23 첫 수동 실행에서 실패). repository secret `SEC_USER_AGENT`(예: `thebriefing.kr market-brief 주소@도메인`)로
+  넣는다. 코드에는 주소를 박지 않는다. secret이 없으면 해외 수집 step이 실패하고, 그 주에 국내 회차가 새로 적재됐으면
+  해외 줄이 비어 버린다.
 - 평일 공시 갱신(`daily-stocks.yml`)은 해외를 건드리지 않는다(DART 고유번호가 없어 건너뛴다). 해외는 토요일에만 갈린다.
 
 ### 유료 전환 시 주의

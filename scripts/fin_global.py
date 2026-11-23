@@ -30,8 +30,11 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 KST = dt.timezone(dt.timedelta(hours=9))
-# SEC는 자동 요청에 User-Agent를 요구한다. 개인 연락처는 싣지 않는다
-UA = {"User-Agent": "thebriefing.kr market-brief", "Accept-Encoding": "identity"}
+# SEC는 자동 요청의 User-Agent에 연락처(메일)를 요구한다. 집 PC에서는 없어도 받아 주지만 GitHub 러너
+# (클라우드 IP)에서는 403으로 막는다(2026-11-23 실측). 연락처는 코드에 박지 않고 secret `SEC_USER_AGENT`로 받는다
+# (예: "thebriefing.kr market-brief 연락용주소@도메인").
+UA = {"User-Agent": os.environ.get("SEC_USER_AGENT", "").strip() or "thebriefing.kr market-brief",
+      "Accept-Encoding": "identity"}
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 REV = ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "SalesRevenueNet",

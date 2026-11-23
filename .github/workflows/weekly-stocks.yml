@@ -93,8 +93,11 @@ jobs:
 
       # 해외 종목(2026-11-23 추가). 국내 적재가 그 회차를 통째로 갈아 끼우므로 반드시 그 뒤에 돈다.
       # SEC EDGAR, Yahoo 시세를 받아 최신 회차 안에 해외 줄만 다시 넣는다. 키는 필요 없다.
+      # SEC는 클라우드 IP에서 연락처 없는 User-Agent를 403으로 막는다. secret에 연락처를 넣는다
       - name: 해외 수집
         if: steps.source.outputs.found == 'true'
+        env:
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
         run: python3 scripts/fin_global.py --fin-trend reports/fin_trend.py --out /tmp/global
 
       - name: 해외 적재
