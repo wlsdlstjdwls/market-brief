@@ -26,6 +26,11 @@ concurrency:
   group: stocks-ingest   # 토요일 적재와 겹치지 않게
   cancel-in-progress: false
 
+# 실패 알림이 실패한 step 이름을 Actions API로 읽는다.
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   patch:
     runs-on: ubuntu-latest
@@ -93,13 +98,6 @@ jobs:
         env:
           TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          if [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT" ]; then
-            echo "텔레그램 secret 없음 — 알림 건너뜀"
-            exit 0
-          fi
-          curl -sS -X POST "https://api.telegram.org/bot$TG_TOKEN/sendMessage" \
-            -d chat_id="$TG_CHAT" \
-            --data-urlencode "text=market-brief 종목 공시 갱신 실패
-          ${RUN_URL}" > /dev/null
+          GH_TOKEN: ${{ github.token }}
+          TARGET: ""
+        run: bash scripts/notify-failure.sh "국내 종목 공시 갱신" "$TARGET"

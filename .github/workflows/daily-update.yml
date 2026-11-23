@@ -45,6 +45,11 @@ concurrency:
   group: daily-update
   cancel-in-progress: false
 
+# 실패 알림이 실패한 step 이름을 Actions API로 읽는다.
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   update:
     runs-on: ubuntu-latest
@@ -247,15 +252,6 @@ jobs:
         env:
           TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          TRADE_DATE: ${{ steps.date.outputs.trade_date }}
-        run: |
-          # secret을 안 넣었으면 조용히 끝낸다. GitHub 기본 실패 메일은 어차피 간다.
-          if [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT" ]; then
-            echo "텔레그램 secret 없음 — 알림 건너뜀"
-            exit 0
-          fi
-          curl -sS -X POST "https://api.telegram.org/bot$TG_TOKEN/sendMessage" \
-            -d chat_id="$TG_CHAT" \
-            --data-urlencode "text=market-brief 일일 갱신 실패 — ${TRADE_DATE}
-          ${RUN_URL}" >/dev/null
+          GH_TOKEN: ${{ github.token }}
+          TARGET: "${{ steps.date.outputs.trade_date }} ${{ steps.date.outputs.session }}"
+        run: bash scripts/notify-failure.sh "일일 갱신" "$TARGET"

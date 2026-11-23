@@ -182,6 +182,32 @@ export function LineChart({
     return d;
   };
 
+  /*
+   * 선 아래 면. 선만 있으면 밋밋하다는 지적(2026-11-23)으로 계열 색을 위에서 아래로 옅어지게 깐다.
+   * null로 끊긴 구간은 구간마다 따로 닫는다. 바닥은 눈금의 맨 아래(lo)다.
+   */
+  const area = (vals: Array<number | null>) => {
+    let d = "";
+    let seg: number[] = [];
+    const close = () => {
+      if (seg.length > 1) {
+        d += `M${x(seg[0]).toFixed(1)},${y(lo).toFixed(1)}`;
+        for (const i of seg) d += `L${x(i).toFixed(1)},${y(vals[i]!).toFixed(1)}`;
+        d += `L${x(seg[seg.length - 1]).toFixed(1)},${y(lo).toFixed(1)}Z`;
+      }
+      seg = [];
+    };
+    vals.forEach((v, i) => (v === null ? close() : seg.push(i)));
+    close();
+    return d;
+  };
+
+  /** 계열마다 마지막 값의 자리. 끝점에 점을 찍는다 */
+  const lastOf = (vals: Array<number | null>) => {
+    for (let i = vals.length - 1; i >= 0; i--) if (vals[i] !== null) return i;
+    return -1;
+  };
+
   return (
     <div className="ch">
       <Legend series={series} />
@@ -194,9 +220,17 @@ export function LineChart({
           onPointerMove={(e) => onMove(e, n, x(0), x(n - 1))}
           onPointerLeave={() => setIdx(null)}
         >
-          <clipPath id={clip}>
-            <rect x={M.l} y={0} width={W - M.l - M.r} height={H} />
-          </clipPath>
+          <defs>
+            <clipPath id={clip}>
+              <rect x={M.l} y={0} width={W - M.l - M.r} height={H} />
+            </clipPath>
+            {series.map((s, k) => (
+              <linearGradient key={s.name} id={`${clip}-g${k}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" style={{ stopColor: `var(${s.color})`, stopOpacity: k === 0 ? 0.22 : 0.12 }} />
+                <stop offset="100%" style={{ stopColor: `var(${s.color})`, stopOpacity: 0 }} />
+              </linearGradient>
+            ))}
+          </defs>
           {ticks.map((t) => (
             <g key={t}>
               <line
@@ -223,10 +257,28 @@ export function LineChart({
             </text>
           ))}
           <g clipPath={`url(#${clip})`}>
+            {series.map((s, k) => (
+              <path key={`a-${s.name}`} d={area(s.values)} style={{ fill: `url(#${clip}-g${k})` }} />
+            ))}
             {series.map((s) => (
               <path key={s.name} className="ch-line" d={path(s.values)} style={{ stroke: `var(${s.color})` }} />
             ))}
           </g>
+          {idx === null
+            ? series.map((s) => {
+                const i = lastOf(s.values);
+                return i < 0 ? null : (
+                  <circle
+                    key={`e-${s.name}`}
+                    className="ch-end"
+                    cx={x(i)}
+                    cy={y(s.values[i]!)}
+                    r={4}
+                    style={{ fill: `var(${s.color})` }}
+                  />
+                );
+              })
+            : null}
           {idx !== null ? (
             <>
               <line className="ch-cross" x1={x(idx)} x2={x(idx)} y1={M.t} y2={H - M.b} />

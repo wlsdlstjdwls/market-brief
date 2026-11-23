@@ -2,6 +2,8 @@ import Link from "next/link";
 import { StockDisclaimer } from "../StockWeekView";
 import Term from "../Term";
 import StockCharts from "./StockCharts";
+import DivJump from "./DivJump";
+import { classifyDividends, dividendYears, payCycle } from "../../lib/dividends";
 import type { getStockDetail } from "../../lib/stock-queries";
 import {
   compareRows,
@@ -356,6 +358,8 @@ export default function StockDetail({
         </div>
       </section>
 
+      <DivHistory s={s} />
+
       <section className="sec">
         <div className="sec-gutter">
           <p className="sec-label">과거와 비교</p>
@@ -538,7 +542,123 @@ function DivSummary({ s }: { s: Stock }) {
         <p className="stk-note">최근 배당이 없습니다.</p>
       )}
       {d ? <p className="stk-note">지금 주가 기준 수익률 {fmtRatio(d.yieldNow)}</p> : null}
+      {/* 분기 몫과 특별배당은 아래 "배당 내역" 절에 있다. 여기서 찾는 사람이 많아 바로 가는 길을 둔다 */}
+      {s.divEvents?.length ? (
+        <DivJump />
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * 배당 지급 건별 내역 (2026-11-23 사용자 지시, "분기별 배당이랑 특별배당도 따로 보여 줘").
+ * 위 "배당" 칸은 DART 사업보고서의 사업연도 합계이고, 여기는 배당락일 기준 한 건씩이다.
+ * 특별배당은 원천이 표시해 주지 않아 금액으로 추정한다(`lib/dividends.ts`).
+ */
+function DivHistory({ s }: { s: Stock }) {
+  const rows = classifyDividends(s.divEvents ?? []);
+  if (!rows.length) return null;
+  const years = dividendYears(rows).slice(0, 5);
+  const thisYear = Number(new Date().toISOString().slice(0, 4));
+  const cycle = payCycle(years, thisYear);
+  const recent = [...rows].reverse().slice(0, 12);
+  const specials = rows.filter((r) => r.special);
+  const lastSpecial = specials[specials.length - 1];
+
+  return (
+    <section className="sec sd-div" id="sd-div">
+      <div className="sec-gutter">
+        <p className="sec-label">배당 내역</p>
+        <p className="sec-note">배당락일 기준, 주당 금액</p>
+      </div>
+      <div className="sec-body">
+        <ul className="sd-div-facts">
+          {cycle ? (
+            <li>
+              <span>지급 주기</span>
+              <b>{cycle}</b>
+            </li>
+          ) : null}
+          <li>
+            <span>최근 지급</span>
+            <b>
+              {fmtPrice(recent[0].amt, s.cur)} <small>{recent[0].d.replace(/-/g, ".")}</small>
+            </b>
+          </li>
+          <li>
+            <span>특별배당 (추정)</span>
+            <b>
+              {lastSpecial ? (
+                <>
+                  {fmtPrice(lastSpecial.amt, s.cur)} <small>{lastSpecial.d.replace(/-/g, ".")}</small>
+                </>
+              ) : (
+                "최근 없음"
+              )}
+            </b>
+          </li>
+        </ul>
+
+        <div className="sd-div-grid">
+          <div className="stk-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>연도</th>
+                  <th className="num">정기 배당</th>
+                  <th className="num">횟수</th>
+                  <th className="num">특별 (추정)</th>
+                  <th className="num">합계</th>
+                </tr>
+              </thead>
+              <tbody>
+                {years.map((y) => (
+                  <tr key={y.year}>
+                    <th scope="row">
+                      {y.year}
+                      {y.year === thisYear ? <small> 진행 중</small> : null}
+                    </th>
+                    <td className="num">{y.count ? fmtPrice(y.regular, s.cur) : "-"}</td>
+                    <td className="num">{y.count || "-"}</td>
+                    <td className={y.special ? "num sd-div-special" : "num"}>
+                      {y.special ? fmtPrice(y.special, s.cur) : "-"}
+                    </td>
+                    <td className="num">
+                      <b>{fmtPrice(y.regular + y.special, s.cur)}</b>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="stk-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>배당락일</th>
+                  <th className="num">주당</th>
+                  <th>구분</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recent.map((r) => (
+                  <tr key={r.d}>
+                    <th scope="row">{r.d.replace(/-/g, ".")}</th>
+                    <td className="num">{fmtPrice(r.amt, s.cur)}</td>
+                    <td>{r.special ? <span className="sd-div-tag">특별 (추정)</span> : "정기"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <p className="stk-note">
+          특별배당은 원천이 따로 표시하지 않아 그 회사의 다른 지급액 중앙값의 1.8배 이상인 건을 특별로
+          추정했습니다. 연도는 배당락일 기준이라 위 사업연도 합계와 다를 수 있습니다.
+        </p>
+      </div>
+    </section>
   );
 }
 

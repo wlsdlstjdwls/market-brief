@@ -1,6 +1,12 @@
 @import "tailwindcss";
 
 /*
+ * 2026-11-23 블랙앤화이트 리디자인 (사용자 지시 "블랙앤화이트 느낌으로").
+ * - 색은 흑, 백, 회색 단계뿐이다. 유일한 예외는 종목 지면의 오르내림 빨강/파랑(한국 증시 관례라
+ *   흑백으로 바꾸면 읽는 사람이 방향을 놓친다).
+ * - 강조는 색이 아니라 굵기, 크기, 검은 바탕 뒤집기(반전)로 한다.
+ * - 크림 배경을 걷고 흰 바탕으로 갔다. 크림이 흑백 대비를 흐렸다.
+ *
  * 디자인 기준: design/design-spec.md — 관공서 통계 고시표.
  * - 카드·박스·둥근 모서리·배경 채움 없음. 헤어라인과 점선 리더만으로 구분한다.
  * - 좌측 라벨 거터 + 데이터 행이 핵심 패턴. 가장 큰 요소는 헤드라인이 아니라 날짜다.
@@ -9,27 +15,46 @@
  */
 
 :root {
-  --bg: #fbfaf7;
-  --fg: #14161a;
-  --lead: #4a4e52; /* 리드 본문 — muted보다 한 단계 진하다 */
-  --muted: #6e7276;
-  --faint: #8c9095;
-  --fainter: #a4a8ac;
-  --faintest: #c2c0ba;
-  --line: #dcd9d2;
-  --line-dot: #d6d3cc;
-  --rule-strong: #14161a;
-  --accent: #2563eb; /* 브랜드 블루. 잉크와 확실히 갈리도록 밝기를 올린 값 */
-  --up: #a32d22;
-  --down: #1b5e9e;
-  /* 차트 계열 색 (종목 브리핑). 고정 순서, 검증기(dataviz) 통과 조합. 오르내림 색과 겹치지 않는다 */
+  --bg: #ffffff;
+  --fg: #0a0a0a;
+  --lead: #2e2e2e; /* 리드 본문 — muted보다 한 단계 진하다 */
+  /* 회색 단계. 흰 바탕에서 가장 흐린 글자(fainter)도 대비 3.4:1 이상 */
+  --muted: #4d4d4d;
+  --faint: #6b6b6b;
+  --fainter: #8a8a8a;
+  --faintest: #bdbdbd;
+  --line: #e3e3e3;
+  --line-dot: #d9d9d9;
+  --rule-strong: #0a0a0a;
+  --tint: #f4f4f4; /* 아주 옅은 회색 바탕 (선택 행, 막대 띠) */
+  /*
+   * 강조색 한 가지. 흑백 위에 점 하나로만 쓴다(번호, 항목 이름, 영향 꼬리표, 켜진 탭 표시).
+   * 처음엔 잉크로 두었다가 "강조 색상이 없다"는 지적을 받아(2026-11-23) 주황을 골랐다.
+   * 빨강, 파랑은 종목 지면의 오르내림이 쓰므로 피했다. 흰 바탕 글자 대비 4.5:1 이상.
+   * 종목 지면에서는 오르내림과 헷갈리지 않게 잉크로 되돌린다(.stk-page).
+   */
+  --accent: #d93a00;
+  /* 텔레그램 구독 자리 전용 파랑(2026-11-23 사용자 지시). 흰 글자 대비 5.2:1. 다른 데는 쓰지 않는다 */
+  --tg: #2563eb;
+  --tg-hover: #1d4ed8;
+  --up: #c8283a;
+  --down: #2263c9;
+  /*
+   * 차트 계열 색. 흑백으로 두었다가 "차트는 색을 넣어 달라, 보기 힘들다"(2026-11-23)는 지적으로
+   * 개편 전 값(dataviz 검증기 통과 조합)으로 되돌렸다. 고정 순서다.
+   */
   --s1: #2563eb;
-  --s2: #c2620a;
+  --s2: #f97316; /* 처음 값 #c2620a는 탁해 밋밋하다는 지적(2026-11-23)으로 밝은 주황으로 */
 }
 
 html {
   color-scheme: light;
   scroll-behavior: smooth;
+  /*
+   * 스크롤바 자리를 늘 비워 둔다. 팝업이 열리며 스크롤을 잠그면 Windows 크롬의 스크롤바(약 17px)가
+   * 사라져 뒤 화면 전체가 옆으로 밀렸다("팝업 열리면서 뒤 화면이 움직인다", 2026-11-23).
+   */
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -50,38 +75,40 @@ a {
 }
 
 a:hover {
-  color: var(--accent);
+  color: var(--fg);
 }
 
 [id] {
   scroll-margin-top: 4.5rem;
 }
 
-/* ---------- 상단 바 ---------- */
+/* ---------- 상단 바 ----------
+   2026-11-23 개편: 흰 바탕, 검은 굵은 선 한 줄. 데스크톱은 워드마크, 메뉴, 구독 버튼이 한 줄이고
+   휴대폰(740px 미만)은 워드마크와 구독 버튼만 남기고 메뉴는 하단 탭 바로 내린다. */
 
 .topbar {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: rgba(251, 250, 247, 0.94);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--rule-strong);
+  /* 반투명(0.96)에 흐림이었는데 스크롤하면 뒤 글자가 비쳐 보였다(2026-11-23 지적). 완전히 막는다 */
+  background: #fff;
+  border-bottom: 2px solid var(--fg);
 }
 
 .topbar-inner {
   margin: 0 auto;
   max-width: 1120px;
-  padding: 11px clamp(20px, 4vw, 40px);
+  height: 56px;
+  padding: 0 clamp(20px, 4vw, 40px);
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px 24px;
+  align-items: center;
+  gap: 36px;
 }
 
 .wordmark {
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
   white-space: nowrap;
 }
 
@@ -95,11 +122,12 @@ a:hover {
 .wordmark-mark {
   display: inline-block;
   vertical-align: -2px;
-  margin-right: 7px;
+  margin-right: 8px;
 }
 
+/* 머리줄만 파랑. 파비콘과 같은 마크다(make-icons.mjs) */
 .wordmark-mark .mark-accent {
-  fill: var(--accent);
+  fill: var(--tg);
 }
 
 .wordmark-mark .mark-ink {
@@ -108,143 +136,172 @@ a:hover {
 
 .topnav {
   display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  font-size: 12.5px;
-  color: var(--muted);
+  align-self: stretch;
+  gap: 28px;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--faint);
 }
 
+.topnav a {
+  display: flex;
+  align-items: center;
+}
+
+.topnav a:hover {
+  color: var(--fg);
+}
+
+/* 켜진 메뉴는 굵기만 올린다. 밑 막대는 2026-11-23 사용자 지시로 뺐다 */
 .topnav a[aria-current="page"] {
   color: var(--fg);
-  font-weight: 500;
+  font-weight: 700;
 }
 
-/* 텔레그램 버튼. 헤더 오른쪽 끝. 좁은 화면에서는 아래 줄로 내려앉되 사라지지 않는다. */
+/* 텔레그램 구독 버튼. 상단 바 오른쪽 끝. 흑백 지면에서 유일한 파랑이다(--tg) */
 .topbar-cta {
   margin-left: auto;
   flex-shrink: 0;
-  padding: 5px 11px 6px;
-  background: var(--accent);
+  padding: 8px 14px;
+  background: var(--tg);
   color: #fff;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   line-height: 1.2;
-  letter-spacing: -0.01em;
   white-space: nowrap;
-  align-self: center;
 }
 
 .topbar-cta:hover {
-  background: #1d4ed8;
+  background: var(--tg-hover);
   color: #fff;
 }
 
-/* 360px 안팎에서 워드마크 + 네비 + 버튼이 한 줄에 다 들어가지 않는다.
-   가로 간격을 좁혀 두 줄까지만 쓰게 한다. */
-@media (max-width: 480px) {
+@media (max-width: 739px) {
   .topbar-inner {
-    gap: 7px 14px;
-    padding: 10px 16px;
+    height: 52px;
+    padding: 0 16px;
   }
 
   .topnav {
-    gap: 14px;
+    display: none;
   }
 
   .topbar-cta {
-    padding: 5px 9px 6px;
-    font-size: 11.5px;
+    padding: 7px 11px;
+    font-size: 12px;
   }
 }
 
-.topbar-note {
-  margin-left: auto;
-  font-size: 11.5px;
-  letter-spacing: 0.08em;
-  color: var(--faint);
-  white-space: nowrap;
+/* ---------- 하단 탭 바 (휴대폰) ----------
+   TabBar.tsx 주석 참고. 740px 이상에서는 숨긴다. 홈 인디케이터에 안 가리게 safe-area를 더한다. */
+
+.tabbar {
+  display: none;
 }
 
-/* ---------- 셸 (목차 거터 + 본문) ---------- */
+@media (max-width: 739px) {
+  :root {
+    --tabbar-h: calc(58px + env(safe-area-inset-bottom));
+  }
+
+  body {
+    padding-bottom: var(--tabbar-h);
+  }
+
+  .tabbar {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 30;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    height: var(--tabbar-h);
+    padding-bottom: env(safe-area-inset-bottom);
+    background: #fff;
+    border-top: 1px solid var(--fg);
+  }
+
+  .tabbar-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--fainter);
+  }
+
+  .tabbar-item svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: square;
+  }
+
+  /* 켜진 칸은 아이콘과 글자를 강조색으로 칠하고 아이콘 선을 굵게. 위 막대는 뺐다(2026-11-23 사용자 지시) */
+  .tabbar-item[aria-current="page"] {
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .tabbar-item[aria-current="page"] svg {
+    stroke-width: 2.4;
+  }
+
+  /*
+   * hover는 마우스가 있는 기기에서만. 휴대폰은 방금 누른 칸에 hover가 남아, 그 검은색이 켜진 칸의 주황을
+   * 덮었다 — "다른 메뉴를 눌러야 이전 메뉴가 빨개진다"(2026-11-23).
+   */
+  @media (hover: hover) {
+    .tabbar-item:not([aria-current="page"]):not([data-pending="true"]):hover {
+      color: var(--fg);
+    }
+  }
+
+  /* 누르는 순간 반응. 페이지가 오기 전에 손가락 아래가 바로 바뀌어야 느리게 느껴지지 않는다 */
+  .tabbar-item:active {
+    background: var(--tint);
+  }
+
+  .tabbar-item[data-pending="true"] {
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .tabbar-item[data-pending="true"] svg {
+    stroke-width: 2.4;
+  }
+}
+
+/* ---------- 셸 ----------
+   2026-11-23 개편: 왼쪽 목차 열을 걷고 한 단으로 간다(Shell.tsx 주석).
+   read는 글 지면, wide는 표와 차트 지면. */
 
 .shell {
   margin: 0 auto;
-  max-width: 1120px;
   padding: 0 clamp(20px, 4vw, 40px) 80px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 0 clamp(28px, 4vw, 56px);
 }
 
-.shell-rail {
-  flex: 0 1 170px;
-  min-width: 150px;
-  padding: clamp(40px, 6vw, 72px) 0 24px;
+.shell--read {
+  /* 상단 바와 좌우 끝을 맞춘다(2026-11-23 사용자 지시 "컨텐츠 영역 너비 늘리기"). 처음엔 800px이었다 */
+  max-width: 1120px;
 }
 
-/*
- * 740px 미만에서는 목차가 본문 위로 접힌다(줄바꿈은 flex-wrap이 알아서 한다).
- * 접힌 상태에서 sticky를 두면 전체폭 목차가 본문을 덮으므로 그때만 끈다.
- */
-@media (min-width: 740px) {
-  .shell-rail {
-    position: sticky;
-    top: 66px;
-  }
+.shell--wide {
+  max-width: 1120px;
 }
 
 .shell-main {
-  flex: 1 1 560px;
   min-width: 0;
-}
-
-/* ---------- 좌측 목차 ---------- */
-
-.rail-title {
-  margin: 0 0 12px;
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  color: var(--fainter);
-}
-
-.rail-link {
-  display: flex;
-  gap: 10px;
-  border-left: 1px solid var(--line);
-  padding: 5px 0 5px 12px;
-  font-size: 13px;
-  color: var(--muted);
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.rail-link:hover {
-  color: var(--fg);
-}
-
-.rail-link[aria-current="true"] {
-  color: var(--accent);
-  border-left-color: var(--accent);
-  font-weight: 600;
-}
-
-.rail-ord {
-  color: var(--fainter);
-}
-
-.rail-meta {
-  margin: 18px 0 0;
-  padding-left: 13px;
-  font-size: 11.5px;
-  line-height: 1.7;
-  color: var(--faintest);
 }
 
 /* ---------- 마스트헤드 ---------- */
 
 .masthead {
-  padding: clamp(40px, 6vw, 72px) 0 clamp(28px, 4vw, 40px);
+  /* 상단 바와 제목 사이가 너무 비었다는 지적(2026-11-23)으로 72px → 32px */
+  padding: clamp(22px, 3vw, 32px) 0 clamp(24px, 3vw, 32px);
 }
 
 .masthead-row {
@@ -255,42 +312,45 @@ a:hover {
 }
 
 .date-xl {
-  font-size: clamp(40px, 7vw, 68px);
-  font-weight: 300;
-  letter-spacing: -0.045em;
+  font-size: clamp(40px, 7vw, 64px);
+  font-weight: 800;
+  letter-spacing: -0.055em;
   line-height: 1;
 }
 
 .masthead-meta {
-  font-size: 13px;
-  letter-spacing: 0.1em;
-  color: var(--faint);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fg);
 }
 
 /* ---------- 회차 탭 ----------
    원본 루틴이 하루 두 번 쓴다. 한 날짜에 프리마켓판과 마감 종합판이 같이 있는 날은
    여기에 탭이 뜬다. 회차가 하나뿐인 날은 아예 그리지 않는다(BriefView가 판단). */
 
+/* 2026-11-23 개편: 밑줄 탭 → 검은 테두리 두 칸 스위치. 켜진 칸은 검은 바탕 반전 */
 .tabs {
-  display: flex;
-  gap: 2px;
-  margin: clamp(22px, 3vw, 30px) 0 0;
-  border-bottom: 1px solid var(--line);
+  display: inline-flex;
+  margin: clamp(22px, 3vw, 28px) 0 0;
+  border: 1.5px solid var(--fg);
 }
 
 .tab {
-  padding: 9px 15px 10px;
-  margin-bottom: -1px;
-  border-bottom: 2px solid transparent;
-  font-size: 13.5px;
-  letter-spacing: -0.01em;
-  color: var(--muted);
+  padding: 8px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
   text-decoration: none;
   white-space: nowrap;
-  transition: color 0.12s ease, border-color 0.12s ease;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.tab + .tab {
+  border-left: 1.5px solid var(--fg);
 }
 
 .tab:hover {
+  background: var(--tint);
   color: var(--fg);
   text-decoration: none;
 }
@@ -305,9 +365,8 @@ a:hover {
  */
 html[data-session="am"] .tab[data-s="am"],
 html:not([data-session="am"]) .tab[data-s="pm"] {
-  color: var(--fg);
-  font-weight: 600;
-  border-bottom-color: var(--rule-strong);
+  background: var(--fg);
+  color: #fff;
 }
 
 /*
@@ -343,18 +402,131 @@ html:not([data-session="am"]) .ses--am {
 }
 
 .tabs + .edition {
-  margin-top: 16px;
+  margin-top: 14px;
 }
 
 .headline {
   margin: clamp(20px, 3vw, 30px) 0 0;
-  max-width: 30ch;
+  max-width: 40ch;
   font-size: clamp(21px, 2.8vw, 29px);
   font-weight: 600;
   line-height: 1.42;
   letter-spacing: -0.03em;
   text-wrap: pretty;
   overflow-wrap: break-word;
+}
+
+/*
+ * "이 회차 한눈에". 마스트헤드와 첫 섹션 사이. 카드 제목만 모은 색인이라 출근길에
+ * 첫 화면에서 훑고 궁금한 것만 눌러 내려간다(2026-11-23 리디자인, 서비스 관점).
+ * 흑백이라 상자 대신 위아래 굵은 선 두 줄로 묶는다.
+ */
+.brief-index {
+  margin: 0 0 clamp(8px, 2vw, 16px);
+  padding: 16px 0 14px;
+  border-top: 2px solid var(--fg);
+}
+
+.brief-index-title {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.brief-index ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: bi;
+}
+
+.brief-index li {
+  counter-increment: bi;
+  border-bottom: 1px solid var(--line);
+}
+
+.brief-index li:last-child {
+  border-bottom: 0;
+}
+
+.brief-index a {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 9px 0;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.brief-index a::before {
+  content: counter(bi, decimal-leading-zero);
+  flex: 0 0 22px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.brief-index a:hover .brief-index-text {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.brief-index-kind {
+  flex: 0 0 64px;
+  font-size: 12px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.brief-index-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-wrap: pretty;
+}
+
+.brief-index-hot {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .brief-index a {
+    flex-wrap: wrap;
+    gap: 2px 10px;
+  }
+
+  .brief-index-kind {
+    flex-basis: auto;
+  }
+
+  .brief-index-text {
+    flex-basis: 100%;
+    order: 3;
+  }
+}
+
+/* 톱기사 — 헤드라인 카드의 본문을 마스트헤드로 올린 것(BriefView 주석) */
+.top-impact {
+  margin: clamp(22px, 3vw, 30px) 0 0;
+}
+
+.top-impact + .headline {
+  margin-top: 10px;
+}
+
+.top-story {
+  margin-top: 18px;
+}
+
+.top-story .topic-text {
+  font-size: 16.5px;
+  color: var(--lead);
 }
 
 .lead {
@@ -368,10 +540,166 @@ html:not([data-session="am"]) .ses--am {
 
 .page-title {
   margin: 0;
-  font-size: clamp(28px, 4.5vw, 44px);
-  font-weight: 300;
-  letter-spacing: -0.035em;
-  line-height: 1.15;
+  font-size: clamp(32px, 5vw, 48px);
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 1.1;
+}
+
+.page-sub {
+  margin: 12px 0 0;
+  max-width: 52ch;
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--muted);
+}
+
+/* ---------- 지난 브리핑 (ArchiveList.tsx) ---------- */
+
+.arc-search {
+  position: sticky;
+  top: 58px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0;
+  background: var(--bg);
+}
+
+.arc-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 46px;
+  padding: 0 14px;
+  border: 1.5px solid var(--fg);
+  border-radius: 0;
+  background: #fff;
+  font: inherit;
+  font-size: 15px;
+  color: var(--fg);
+}
+
+.arc-search input:focus {
+  outline: 2px solid var(--fg);
+  outline-offset: 1px;
+}
+
+.arc-count {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--faint);
+}
+
+.arc-month {
+  padding-top: 28px;
+}
+
+.arc-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.arc-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.arc-row:last-child {
+  border-bottom: 0;
+}
+
+.arc-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 13px 0;
+}
+
+.arc-main:hover .arc-title {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.arc-date {
+  flex: 0 0 52px;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.arc-date b {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.arc-date i {
+  font-size: 12px;
+  font-style: normal;
+  color: var(--faint);
+}
+
+.arc-title {
+  font-size: 15.5px;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.arc-editions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 4px;
+}
+
+.arc-ed {
+  padding: 2px 7px;
+  border: 1px solid var(--fg);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.arc-ed:hover {
+  background: var(--fg);
+  color: #fff;
+}
+
+.arc-ed--none {
+  border-color: var(--line);
+  color: var(--faintest);
+}
+
+.arc-empty {
+  padding: 48px 0;
+}
+
+@media (max-width: 739px) {
+  .arc-search {
+    top: 54px;
+  }
+
+  .arc-row {
+    flex-wrap: wrap;
+    gap: 0 12px;
+    padding-bottom: 12px;
+  }
+
+  .arc-main {
+    flex-basis: 100%;
+    padding-bottom: 6px;
+  }
+
+  .arc-editions {
+    margin-left: 68px;
+  }
 }
 
 .sec-heading {
@@ -383,48 +711,55 @@ html:not([data-session="am"]) .ses--am {
 
 /* ---------- 섹션 ---------- */
 
+/*
+ * 2026-11-23 개편: 라벨 거터(왼쪽 130px)를 걷고 섹션 머리를 본문 위 한 줄로 올렸다.
+ * 머리줄은 위에 검은 굵은 선, 왼쪽에 번호와 이름, 오른쪽에 보조 링크. 신문 지면의 꼭지 머리다.
+ */
 .sec {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 28px;
-  padding: 26px 0;
-  border-top: 1px solid var(--line);
-}
-
-.sec--first {
-  border-top-color: var(--rule-strong);
+  padding: 40px 0 8px;
 }
 
 .sec-gutter {
-  flex: 0 0 130px;
-  min-width: 130px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  margin-bottom: 6px;
+  padding-top: 12px;
+  border-top: 2px solid var(--fg);
 }
 
 .sec-body {
-  flex: 1 1 380px;
   min-width: 0;
 }
 
 .sec-label {
   margin: 0;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--fg);
+}
+
+.sec-ord {
+  margin-right: 4px;
   color: var(--accent);
 }
 
 .sec-note {
-  margin: 6px 0 0;
-  font-size: 11.5px;
-  letter-spacing: 0.06em;
-  color: var(--fainter);
+  margin: 0;
+  font-size: 13px;
+  color: var(--faint);
 }
 
 .sec-link {
   display: inline-block;
-  margin-top: 6px;
-  font-size: 11.5px;
-  color: var(--fainter);
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .sec-empty {
@@ -524,12 +859,13 @@ html:not([data-session="am"]) .ses--am {
 
 .list-date {
   flex: 0 0 78px;
-  font-size: 12.5px;
-  color: var(--fainter);
+  font-size: 13px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
 }
 
 .list-title {
-  font-size: 14.5px;
+  font-size: 15px;
   line-height: 1.6;
   text-wrap: pretty;
 }
@@ -537,34 +873,34 @@ html:not([data-session="am"]) .ses--am {
 /* ---------- 뉴스 카드 ---------- */
 
 .topic {
-  padding: 18px 0;
+  padding: 26px 0 26px;
   border-top: 1px solid var(--line);
 }
 
 .topic:first-child {
-  padding-top: 0;
+  padding-top: 14px;
   border-top: 0;
 }
 
 .topic-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 6px;
+  gap: 12px;
+  margin-bottom: 8px;
 }
 
 .topic-no {
   flex: 0 0 auto;
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  color: var(--fainter);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
 
 .topic-title {
   margin: 0;
-  font-size: 16.5px;
+  font-size: 19px;
   line-height: 1.5;
   letter-spacing: -0.015em;
   font-weight: 600;
@@ -608,16 +944,27 @@ html:not([data-session="am"]) .ses--am {
 }
 
 .topic-impact--max {
-  color: #b3261e;
+  padding: 2px 8px 2px 6px;
+  background: var(--accent);
+  color: #fff;
   font-weight: 700;
 }
 
+.topic-impact--max .impact-bar {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.topic-impact--max .impact-bar--on {
+  background: #fff;
+}
+
 .topic-impact--high {
-  color: #b3261e;
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .topic-impact--mid {
-  color: #55595e;
+  color: var(--muted);
 }
 
 .topic-impact--low {
@@ -625,22 +972,57 @@ html:not([data-session="am"]) .ses--am {
 }
 
 .topic-line {
-  margin: 10px 0 0;
-  max-width: 60ch;
-  font-size: 14.5px;
+  margin: 16px 0 0;
+  max-width: 80ch;
+}
+
+.topic-text {
+  margin: 0;
+  font-size: 15.5px;
   line-height: 1.85;
+}
+
+/* 짧은 값("매우 높음", "단기")을 모은 한 줄. TopicLines 주석 참고 */
+.topic-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 12px 0 0;
+  font-size: 14px;
+}
+
+.topic-fact {
+  white-space: nowrap;
+}
+
+.topic-fact + .topic-fact {
+  padding-left: 18px;
+  border-left: 1px solid var(--line);
+}
+
+.topic-fact-label {
+  margin-right: 7px;
+  font-size: 13px;
+  color: var(--faint);
 }
 
 /*
  * 항목 이름은 본문과 같은 줄에 둔다. 줄을 따로 잡으면 카드 하나에 작은 제목이 네 개씩
  * 쌓여 정작 본문이 안 읽힌다는 지적이 있었다. 대신 색과 굵기로 구분한다.
  */
+/* 항목 이름. 본문 위 제 줄 (BriefView TopicLines 주석) */
 .topic-label {
-  margin-right: 8px;
+  margin: 0 0 3px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--accent);
-  white-space: nowrap;
+}
+
+.topic-sources-label {
+  margin-right: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--faint);
 }
 
 /*
@@ -654,7 +1036,7 @@ html:not([data-session="am"]) .ses--am {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 6px;
-  margin: 10px 0 0;
+  margin: 16px 0 0;
 }
 
 .source-chip {
@@ -723,8 +1105,8 @@ html:not([data-session="am"]) .ses--am {
 /* ---------- 산문 ---------- */
 
 .prose {
-  max-width: 60ch;
-  font-size: 14.5px;
+  max-width: 80ch;
+  font-size: 15.5px;
   line-height: 1.85;
 }
 
@@ -767,7 +1149,7 @@ html:not([data-session="am"]) .ses--am {
 
 .prose h2,
 .prose h3 {
-  font-size: 14.5px;
+  font-size: 15.5px;
   font-weight: 600;
   margin: 1.4rem 0 0.5rem;
 }
@@ -866,6 +1248,77 @@ html:not([data-session="am"]) .ses--am {
 
 .stk-table tbody th a:hover {
   color: var(--accent);
+}
+
+/* 머리줄의 첫 칸도 왼쪽에 붙인다. 몸통 첫 칸만 붙어 있어 가로로 밀면 머리와 몸통이 어긋나 깨져 보였다 */
+.stk-table thead th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--bg);
+}
+
+/*
+ * 종목 목록 표(StockExplorer Table)를 휴대폰에서는 카드 목록으로 편다(2026-11-23, "모바일은 표가 가로로
+ * 길어 보기 힘들다"). 12열을 가로로 밀어 보는 대신 종목마다 이름 한 줄 + 값 두 칸 격자이고, 값 앞에 열
+ * 이름을 단다. 정렬은 위 "정렬" 드롭다운으로 하므로 머리줄은 숨긴다.
+ */
+@media (max-width: 739px) {
+  .stk-page .stk-table--list {
+    overflow: visible;
+  }
+
+  .stk-page .stk-table--list table,
+  .stk-page .stk-table--list tbody {
+    display: block;
+  }
+
+  .stk-page .stk-table--list thead {
+    display: none;
+  }
+
+  .stk-page .stk-table--list tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 18px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .stk-page .stk-table--list tbody th,
+  .stk-page .stk-table--list tbody td {
+    position: static;
+    padding: 0;
+    border: 0;
+    white-space: normal;
+  }
+
+  .stk-page .stk-table--list tbody th {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 4px;
+    font-size: 16px;
+  }
+
+  .stk-page .stk-table--list tbody td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 14px;
+    text-align: right;
+  }
+
+  .stk-page .stk-table--list tbody td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--faint);
+    text-align: left;
+  }
 }
 
 .stk-table .num {
@@ -1395,7 +1848,7 @@ html:not([data-session="am"]) .ses--am {
   overflow-x: auto;
   margin: 0 0 22px;
   padding: 10px 0;
-  border-top: 1px solid var(--rule-strong);
+  /* 위 선은 뺐다(2026-11-23 사용자 지시). 붙었을 때 상단 바의 검은 선과 겹쳐 두 줄로 보였다 */
   border-bottom: 1px solid var(--line);
   font-size: 13.5px;
   white-space: nowrap;
@@ -1953,8 +2406,15 @@ html:not([data-session="am"]) .ses--am {
 
 .ch-line {
   fill: none;
-  stroke-width: 2;
+  stroke-width: 2.5;
   stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* 선 끝점. 흰 테두리로 선 위에 떠 보이게 */
+.ch-end {
+  stroke: #fff;
+  stroke-width: 2;
 }
 
 .ch-cross {
@@ -2240,7 +2700,8 @@ html:not([data-session="am"]) .ses--am {
   max-width: 66ch;
   margin: 14px 0 0;
   padding: 10px 14px;
-  border-left: 3px solid var(--accent);
+  /* 왼쪽 검은 줄 대신 옅은 회색 바탕 (2026-11-23 사용자 지시 "왼쪽 까만줄 비선호") */
+  background: var(--tint);
   font-size: 13.5px;
   line-height: 1.75;
   color: var(--muted);
@@ -2307,7 +2768,7 @@ html:not([data-session="am"]) .ses--am {
   font-size: 13.5px;
   font-weight: 600;
   line-height: 1.5;
-  color: var(--accent);
+  color: var(--tg);
   border-bottom: 1px solid currentColor;
   padding-bottom: 2px;
 }
@@ -3050,7 +3511,7 @@ html:not([data-session="am"]) .ses--am {
 .rank-fill {
   position: absolute;
   inset: 0 auto 0 0;
-  background: rgba(37, 99, 235, 0.09);
+  background: var(--tint);
 }
 
 .rank-label,
@@ -3088,7 +3549,7 @@ html:not([data-session="am"]) .ses--am {
 .bar-cell-fill {
   position: absolute;
   inset: 0 auto 0 0;
-  background: rgba(37, 99, 235, 0.11);
+  background: #e9e9e9;
 }
 
 .bar-cell b {
@@ -3105,11 +3566,13 @@ html:not([data-session="am"]) .ses--am {
    카드와 패널에 흰 바탕을 깐다. 뉴스 지면은 건드리지 않는다. */
 
 .stk-page {
-  --muted: #45494e;
-  --faint: #5d6166;
-  --fainter: #75797e;
-  --faintest: #9a9893;
-  --line: #d6d2c9;
+  /* 오르내림 빨강/파랑과 헷갈리지 않게 이 지면의 강조는 잉크다 */
+  --accent: #0a0a0a;
+  --muted: #404040;
+  --faint: #595959;
+  --fainter: #737373;
+  --faintest: #9e9e9e;
+  --line: #dcdcdc;
   --surface: #ffffff;
 }
 
@@ -3431,12 +3894,33 @@ html:not([data-session="am"]) .ses--am {
    (없으면 브라우저가 터치를 스크롤로 가로채 pointercancel이 나서 끌기가 씹힌다).
    이 지면의 다른 칸은 각지게 두지만 시트만은 fitin-app 모양을 따른다. */
 
-.bs-overlay,
-.bs-loading {
+.bs-overlay {
   position: fixed;
   inset: 0;
   z-index: 60;
   background: rgba(0, 0, 0, 0.6);
+}
+
+/* 로딩 틀(loading.tsx) 안에서 도는 고리. 시트는 흰 바탕이라 잉크색이다 */
+.bs-spinner {
+  width: 34px;
+  height: 34px;
+  border: 3px solid var(--line);
+  border-top-color: var(--fg);
+  border-radius: 50%;
+  animation: bs-spin 0.7s linear infinite;
+}
+
+@keyframes bs-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bs-spinner {
+    animation-duration: 2s;
+  }
 }
 
 .bs-overlay {
@@ -3585,8 +4069,6 @@ html:not([data-session="am"]) .ses--am {
    브랜드 블루 대신 잉크색으로 둔다. 파랑은 "내렸다" 하나만 뜻한다. */
 
 .stk-page {
-  --up: #c8283a;
-  --down: #2263c9;
   --up-bg: #fff0f0;
   --down-bg: #eef4ff;
 }
@@ -3651,8 +4133,8 @@ html:not([data-session="am"]) .ses--am {
 .stk-page .stx-patched-note {
   margin: 12px 0 0;
   padding: 10px 14px;
-  border-left: 3px solid var(--fg);
-  background: var(--surface);
+  /* 왼쪽 검은 줄 대신 옅은 회색 바탕 (2026-11-23 사용자 지시 "왼쪽 까만줄 비선호") */
+  background: var(--tint);
   font-size: 14px;
   line-height: 1.75;
   color: var(--muted);
@@ -3848,9 +4330,13 @@ html:not([data-session="am"]) .ses--am {
    값을 못 받은 첫 그림에서는 48px(넓은 화면 실측)로 붙는다 */
 .stk-page .stx-toc {
   position: sticky;
-  top: var(--topbar-h, 48px);
+  /* 값을 못 받은 첫 그림의 기본값. 지금 상단 바는 56px + 선 2px이다 */
+  top: var(--topbar-h, 58px);
   z-index: 5;
   background: var(--bg);
+  /* 붙은 줄 양옆으로 뒤 내용이 비치지 않게 바탕을 화면 끝까지 넓힌다 */
+  box-shadow: 0 0 0 100vmax var(--bg);
+  clip-path: inset(0 -100vmax);
 }
 
 .stk-page #stx-overview,
@@ -3865,7 +4351,8 @@ html:not([data-session="am"]) .ses--am {
 .stk-top {
   position: fixed;
   right: max(16px, env(safe-area-inset-right));
-  bottom: max(20px, calc(env(safe-area-inset-bottom) + 12px));
+  /* 휴대폰에서는 하단 탭 바 위에 뜬다(--tabbar-h는 740px 미만에서만 정의된다) */
+  bottom: calc(var(--tabbar-h, 0px) + 20px);
   z-index: 40;
   display: inline-flex;
   align-items: center;
@@ -3930,4 +4417,123 @@ html:not([data-session="am"]) .ses--am {
   .stk-top {
     transition: none;
   }
+}
+
+/* 사분면 목록 "외 N" 단추 (StockExplorer Quadrants) */
+.stx-quad-more {
+  padding: 0 7px;
+  border: 1px solid var(--fg);
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.stx-quad-more:hover {
+  background: var(--fg);
+  color: #fff;
+}
+
+
+/* ---------- 배당 내역 (StockDetail DivHistory, 2026-11-23) ---------- */
+.sd-div-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  margin: 6px 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.sd-div-facts li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sd-div-facts span {
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+.sd-div-facts b {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.sd-div-facts small {
+  margin-left: 4px;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--faint);
+}
+
+.sd-div-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 739px) {
+  .sd-div-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sd-div-special {
+  color: var(--s2);
+  font-weight: 700;
+}
+
+.sd-div-tag {
+  padding: 1px 6px;
+  background: var(--s2);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sd-div th small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--faint);
+}
+
+.sd-div-jump {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 5px 10px;
+  border: 1px solid var(--fg);
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.sd-div-jump:hover {
+  background: var(--fg);
+  color: #fff;
+}
+
+/* 로딩 틀의 본문과 제목 자리 */
+.bs-content--loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+}
+
+.bs-title--loading {
+  display: block;
+  flex: 0 0 140px;
+  width: 140px;
+  margin-right: auto;
+  height: 18px;
+  background: var(--tint);
 }

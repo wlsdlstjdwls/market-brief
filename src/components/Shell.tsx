@@ -3,19 +3,22 @@ import { NAV } from "../lib/nav";
 import { CONTACT_EMAIL, TELEGRAM_URL } from "../lib/site";
 
 /**
- * 고시표 셸. 좌측 목차 거터(있을 때만) + 본문 열, 본문 열 끝에 푸터.
- * 목차가 없는 페이지에서는 본문 열이 셸 전체 폭을 쓴다 — 거터 패턴은 섹션이 그대로 유지한다.
+ * 지면 셸. 본문 한 단 + 끝에 텔레그램 안내와 푸터.
+ *
+ * 2026-11-23 개편에서 왼쪽 목차 열을 걷었다. 회차마다 "이 회차 한눈에" 색인이 그 일을
+ * 하고, 목차 열이 본문을 오른쪽으로 밀어 읽는 폭이 좁았다.
+ *   read — 글 지면(브리핑, 지난 호, 안내 문서). 한 줄 길이를 읽기 좋은 폭으로 묶는다
+ *   wide — 표와 차트 지면(종목 브리핑)
  */
 export default function Shell({
-  rail,
+  width = "read",
   children,
 }: {
-  rail?: React.ReactNode;
+  width?: "read" | "wide";
   children: React.ReactNode;
 }) {
   return (
-    <div className="shell">
-      {rail ? <div className="shell-rail">{rail}</div> : null}
+    <div className={`shell shell--${width}`}>
       <div className="shell-main">
         {children}
         <TelegramCta />
@@ -52,7 +55,7 @@ function SiteFooter() {
       <div className="footer-top">
         <p className="footer-mark">더 브리핑</p>
         <nav className="footer-nav">
-          {NAV.slice(1).map((n) => (
+          {NAV.map((n) => (
             <Link key={n.href} href={n.href}>
               {n.label}
             </Link>

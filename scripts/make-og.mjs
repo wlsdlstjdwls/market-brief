@@ -17,19 +17,28 @@ const W = 1200;
 const H = 630;
 const FONT = "Malgun Gothic, Noto Sans KR, sans-serif";
 
+/*
+ * 2026-11-23 흑백 개편판. 검은 판 위에 파비콘과 같은 마크(흰 막대 둘, 머리줄만 파랑)와
+ * 흰 워드마크. 카카오톡, 슬랙 미리보기에서 흰 바탕 카드들 사이에 묻히지 않게 판을 검게 깐다.
+ * 마크 좌표는 make-icons.mjs의 64단위 마크를 4.5배로 키운 것이다.
+ */
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
-  <rect width="${W}" height="${H}" fill="#fbfaf7"/>
-  <rect x="0" y="0" width="${W}" height="10" fill="#2563eb"/>
+  <rect width="${W}" height="${H}" fill="#0a0a0a"/>
 
-  <text x="90" y="200" font-family="${FONT}" font-size="34" font-weight="600" fill="#2563eb" letter-spacing="6">DAILY</text>
+  <g transform="translate(96 150) scale(4.5)">
+    <rect x="0" y="0" width="40" height="8" fill="#2563eb"/>
+    <rect x="0" y="16" width="40" height="8" fill="#ffffff"/>
+    <rect x="0" y="32" width="24" height="8" fill="#ffffff"/>
+  </g>
 
-  <text x="90" y="330" font-family="${FONT}" font-size="104" font-weight="700" fill="#14161a">더 브리핑</text>
+  <text x="340" y="262" font-family="${FONT}" font-size="118" font-weight="800" fill="#ffffff" letter-spacing="-4">더 브리핑</text>
 
-  <rect x="90" y="382" width="120" height="3" fill="#14161a"/>
+  <text x="96" y="430" font-family="${FONT}" font-size="40" font-weight="600" fill="#ffffff">그날 시장을 움직인 뉴스와 테마</text>
+  <text x="96" y="484" font-family="${FONT}" font-size="30" fill="#a3a3a3">평일 아침과 장 마감 뒤, 하루 두 번</text>
 
-  <text x="90" y="452" font-family="${FONT}" font-size="36" fill="#4a4e52">그날 시장을 움직인 뉴스와 테마</text>
-
-  <text x="90" y="548" font-family="${FONT}" font-size="26" fill="#6e7276">개별 종목, 관련주, 목표주가는 싣지 않습니다</text>
+  <rect x="96" y="540" width="${W - 192}" height="1" fill="#3a3a3a"/>
+  <text x="96" y="586" font-family="${FONT}" font-size="24" fill="#8a8a8a">개별 종목, 관련주, 목표주가는 싣지 않습니다</text>
+  <text x="${W - 96}" y="586" font-family="${FONT}" font-size="24" font-weight="600" fill="#ffffff" text-anchor="end">thebriefing.kr</text>
 </svg>`;
 
 const png = await sharp(Buffer.from(svg)).png().toBuffer();

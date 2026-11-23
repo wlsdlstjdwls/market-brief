@@ -27,6 +27,8 @@ export interface BriefListItem {
   headline: string;
   summary: string;
   publishedAt: Date | null;
+  /** 그날 발행된 회차. 지난 브리핑 목록이 "아침, 마감" 표시를 붙이는 데 쓴다 */
+  sessions: Session[];
 }
 
 /**
@@ -53,7 +55,9 @@ export async function listBriefs(limit = 60): Promise<BriefListItem[]> {
       .limit(limit * 2);
 
     const byDate = new Map<string, (typeof rows)[number]>();
+    const sessionsOf = new Map<string, Session[]>();
     for (const r of rows) {
+      sessionsOf.set(r.tradeDate, [...(sessionsOf.get(r.tradeDate) ?? []), r.session as Session]);
       const cur = byDate.get(r.tradeDate);
       // 같은 날짜면 pm이 이긴다. pm이 없는 날만 am이 대표가 된다.
       if (!cur || (cur.session === "am" && r.session === "pm")) byDate.set(r.tradeDate, r);
@@ -63,6 +67,7 @@ export async function listBriefs(limit = 60): Promise<BriefListItem[]> {
       .slice(0, limit)
       .map(({ tradeDate, headline, summary, publishedAt }) => ({
         tradeDate, headline, summary, publishedAt,
+        sessions: (sessionsOf.get(tradeDate) ?? []).sort(),
       }));
   } catch (e) {
     console.error("listBriefs 실패:", e);

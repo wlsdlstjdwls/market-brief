@@ -5,7 +5,7 @@ import { Noto_Sans_KR } from "next/font/google";
 import Link from "next/link";
 import TopNav from "../components/TopNav";
 import VisitTracker from "../components/VisitTracker";
-import { NAV } from "../lib/nav";
+import TabBar from "../components/TabBar";
 import {
   GOOGLE_VERIFICATION,
   NAVER_VERIFICATION,
@@ -65,12 +65,12 @@ export const metadata: Metadata = {
  * 한 값이면 된다.
  */
 export const viewport: Viewport = {
-  themeColor: "#fbfaf7",
+  themeColor: "#ffffff",
   colorScheme: "light",
 };
 
 /**
- * 워드마크 앞의 마크. 브리핑 한 편을 세 줄로 줄인 모양이고 머리줄만 브랜드색이다.
+ * 워드마크 앞의 마크. 브리핑 한 편을 세 줄로 줄인 모양이다. 흑백 개편(2026-11-23) 뒤로는 세 줄 다 잉크다.
  * 파비콘·앱 아이콘과 같은 도형이다 (`scripts/make-icons.mjs`).
  *
  * 인라인 `svg`로 둔다. `.topbar-inner`가 `align-items: baseline`이라 워드마크를
@@ -95,7 +95,7 @@ function Header() {
           <Mark />
           더 브리핑
         </Link>
-        <TopNav items={[...NAV]} />
+        <TopNav />
         {/*
           텔레그램 버튼. 푸터 위 안내 한 줄만으로는 눈에 안 띈다는 지적을 받아 헤더로 올렸다.
           `margin-left: auto`로 오른쪽 끝에 붙고, 좁은 화면에서는 `.topbar-inner`가
@@ -123,10 +123,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko" className={sans.variable}>
+    // data-session은 날짜 페이지의 인라인 스크립트가 그리기 전에 넣는다(SessionTabs 주석).
+    // 서버 HTML에는 없는 속성이라 React가 hydration 불일치로 경고한다. 의도한 차이라 끈다.
+    <html lang="ko" className={sans.variable} suppressHydrationWarning>
       <body>
         <Header />
         <main>{children}</main>
+        <TabBar />
         {/*
           방문 한 줄을 우리 page_view 표에 적는다. 유입 경로를 보려면 이게 있어야 한다 —
           Vercel Analytics는 관리자 화면에 숫자를 못 꽂아 준다.

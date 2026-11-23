@@ -50,7 +50,7 @@ export default async function StockPage({ params }: Params) {
   const hit = await find(code);
   if (!hit) notFound();
   return (
-    <Shell>
+    <Shell width="wide">
       <StockDetail hit={hit} />
     </Shell>
   );

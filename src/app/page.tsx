@@ -1,23 +1,23 @@
-import BriefView from "../components/BriefView";
+import BriefDay from "../components/BriefDay";
 import Shell from "../components/Shell";
-import { getBrief, listBriefs } from "../lib/queries";
+import { getBriefDay, listBriefs } from "../lib/queries";
 
 export const revalidate = 300;
 
 /**
- * 홈은 가장 최근 날짜의 마감 종합판을 보여준다.
+ * 홈은 가장 최근 날짜의 회차를 전부 굽는다(BriefDay 주석). 기본은 마감판이고 아침 탭은
+ * 페이지 이동 없이 그 자리에서 바뀐다.
  *
- * 여기서 ?s=am을 받지 않는 이유는 캐시다. searchParams를 읽는 순간 이 페이지는
- * 매 요청 서버 렌더로 바뀌어 revalidate가 무시된다. 회차 탭은 /brief/{날짜}로 보내고,
- * 트래픽이 몰리는 홈은 5분 캐시를 지킨다.
+ * 여기서도 searchParams를 읽지 않는다. 읽는 순간 매 요청 서버 렌더로 바뀌어 revalidate가
+ * 무시된다. `/?s=am`은 브라우저의 인라인 스크립트가 읽는다.
  */
 export default async function Home() {
-  const data = await getBrief();
+  const items = await getBriefDay();
   const recent = (await listBriefs(7))
-    .filter((b) => b.tradeDate !== data?.brief.tradeDate)
+    .filter((b) => b.tradeDate !== items[0]?.brief.tradeDate)
     .slice(0, 6);
 
-  if (!data) {
+  if (!items.length) {
     return (
       <Shell>
         <p className="sec-empty" style={{ padding: "clamp(40px,6vw,72px) 0" }}>
@@ -27,12 +27,5 @@ export default async function Home() {
     );
   }
 
-  return (
-    <BriefView
-      brief={data.brief}
-      sessions={data.sessions}
-      topics={data.topics}
-      recent={recent}
-    />
-  );
+  return <BriefDay items={items} basePath="/" recent={recent} />;
 }

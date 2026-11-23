@@ -16,6 +16,8 @@
  */
 
 /** 화면에 실을 분기 한 줄. 단위는 원(KRW)이고 화면에서 억원으로 바꾼다. */
+import type { DivEvent } from "./dividends";
+
 export type StockPeriod = {
   rev: number | null;
   op: number | null;
@@ -126,6 +128,11 @@ export type Stock = {
     payout: Array<number | null>;
     yieldNow: number | null;
   } | null;
+  /**
+   * 배당 지급 건별 내역(배당락일, 주당 금액). 원본 수집기가 아니라 `scripts/fetch-div.ts`가 따로 붙인다.
+   * 분기 몫과 특별배당(추정)은 `src/lib/dividends.ts`가 가른다. 받기 전 회차는 없다.
+   */
+  divEvents?: DivEvent[] | null;
   /** 최근 1년 주요 공시. 정기보고서는 뺀다(분기마다 같은 제목이라 정보가 없다) */
   disc: Disclosure[];
   /** 실적 발표 패턴. nextExpected 는 추정값이다 */
@@ -179,9 +186,19 @@ export function knownReceipts(s: Pick<Stock, "disc" | "patch">): string[] {
  * 새로 수집한 종목을 회차의 기존 줄에 끼운다. 그룹은 회차 것을 지킨다 — 평일 수집기는 임시 관심종목
  * 목록으로 돌아서 그룹 이름이 회차와 다를 수 있다. `seen`에는 이전에 본 번호도 남긴다.
  */
-export function applyPatch(fresh: Stock, prev: Pick<Stock, "sector" | "disc" | "patch">, patch: StockPatch): Stock {
+export function applyPatch(
+  fresh: Stock,
+  prev: Pick<Stock, "sector" | "disc" | "patch" | "divEvents">,
+  patch: StockPatch,
+): Stock {
   const seen = [...new Set([...knownReceipts(prev), ...patch.seen])];
-  return { ...fresh, sector: prev.sector, patch: { on: patch.on, titles: patch.titles, seen } };
+  // 배당 건별 내역은 원본 수집기가 만들지 않는다(fetch-div.ts가 붙인다). 다시 수집한 줄에는 없으니 물려받는다
+  return {
+    ...fresh,
+    sector: prev.sector,
+    divEvents: fresh.divEvents ?? prev.divEvents ?? null,
+    patch: { on: patch.on, titles: patch.titles, seen },
+  };
 }
 
 export type StockWeekData = {

@@ -21,9 +21,11 @@ import sharp from "sharp";
 import { mkdirSync, writeFileSync } from "node:fs";
 
 /** 브랜드 값. `globals.css`의 토큰과 같아야 한다. */
-const BG = "#fbfaf7";
+// 2026-11-23 흑백 개편: 검은 판에 흰 막대, 머리줄만 예전 브랜드 파랑(사용자 지시 "이전처럼 색 넣어 줘").
+// 파랑은 사이트의 텔레그램 구독 자리(--tg)와 같은 값이다.
+const BG = "#0a0a0a";
 const ACCENT = "#2563eb";
-const INK = "#14161a";
+const INK = "#ffffff";
 
 /**
  * 마크 세 줄. 브리핑 한 편을 줄로 줄인 모양이고, 머리줄만 브랜드 블루다.

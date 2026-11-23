@@ -2,25 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { NAV, navActive } from "../lib/nav";
 
-/** 상단 네비. 현재 경로만 잉크색 500으로 올린다(밑줄이나 배경 없음). */
-export default function TopNav({
-  items,
-}: {
-  items: { href: string; label: string }[];
-}) {
+/** 상단 네비(데스크톱). 켜진 칸은 굵게, 아래에 검은 막대. 휴대폰에서는 숨기고 탭 바가 대신한다. */
+export default function TopNav() {
   const path = usePathname();
-
   return (
-    <nav className="topnav">
-      {items.map((n) => {
-        const on = n.href === "/" ? path === "/" : path.startsWith(n.href);
-        return (
-          <Link key={n.href} href={n.href} aria-current={on ? "page" : undefined}>
-            {n.label}
-          </Link>
-        );
-      })}
+    <nav className="topnav" aria-label="주 메뉴">
+      {NAV.map((n) => (
+        <Link key={n.href} href={n.href} aria-current={navActive(n.href, path) ? "page" : undefined}>
+          {n.label}
+        </Link>
+      ))}
     </nav>
   );
 }

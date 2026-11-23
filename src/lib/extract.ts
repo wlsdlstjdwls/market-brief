@@ -205,6 +205,35 @@ export function assertRegistryOnly(p: BriefPayload): void {
 }
 
 
+/** 같은 문단은 한 번만. 공백 차이는 무시한다. */
+function uniq(paras: string[]): string[] {
+  const seen = new Set<string>();
+  return paras.filter((p) => {
+    const k = p.replace(/\s+/g, " ").trim();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+/** 종류와 제목이 같은 카드는 첫 장만 남기고, 종류마다 순번을 다시 매긴다. 제자리에서 고친다. */
+export function dedupeTopics(topics: Topic[]): void {
+  const seen = new Set<string>();
+  const kept = topics.filter((t) => {
+    const k = `${t.kind}\u0000${t.title.replace(/\s+/g, " ").trim()}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  const rank = new Map<string, number>();
+  for (const t of kept) {
+    const n = (rank.get(t.kind) ?? 0) + 1;
+    rank.set(t.kind, n);
+    t.rank = n;
+  }
+  topics.splice(0, topics.length, ...kept);
+}
+
 export function buildPayload(
   files: Record<string, string>,
   tradeDate: string,
@@ -238,8 +267,14 @@ export function buildPayload(
   const usSections = pickSections(all, /미국\s*증시|채권|환율|원자재|변동성|지정학|예정\s*지표/);
   const krSections = pickSections(all, /한국\s*증시|지수\s*마감|하루의\s*흐름|수급|결론/);
 
-  const macroParas = usSections.flatMap((s) => cleanParagraphs(s, dropped));
-  const krParas = krSections.flatMap((s) => cleanParagraphs(s, dropped));
+  /*
+   * 파일을 넘나드는 중복을 걷는다. 2026-11부터 원고 루틴이 일일리포트.md의 섹션을
+   * 시황.md에 그대로 복사해 두는데, 카드 중복 검사가 파일 안에서만 돌아 11-23 마감판의
+   * 카드와 국내 시장 문단이 전부 두 번씩 실렸다. 먼저 나온 쪽(파일 순서)을 남긴다.
+   */
+  const macroParas = uniq(usSections.flatMap((s) => cleanParagraphs(s, dropped)));
+  const krParas = uniq(krSections.flatMap((s) => cleanParagraphs(s, dropped)));
+  dedupeTopics(topics);
 
   /*
    * 헤드라인은 그날 첫 뉴스 카드의 제목이다.

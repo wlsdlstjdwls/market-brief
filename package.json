@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/patch-next-dev.mjs && next dev",
     "build": "next build",
     "start": "next start",
     "guard": "tsx scripts/guard-check.ts",

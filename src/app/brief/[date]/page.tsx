@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import BriefView from "../../../components/BriefView";
+import BriefDay from "../../../components/BriefDay";
 import { getBriefDay, listBriefs } from "../../../lib/queries";
 import { SITE_DESCRIPTION } from "../../../lib/site";
 
@@ -23,10 +23,6 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
  * `useEffect`로 하면 첫 화면이 마감판으로 한 번 그려졌다가 아침판으로 바뀌어 깜빡인다.
  * **텔레그램 아침 알림이 `?s=am`으로 바로 보내므로** 그 깜빡임은 주 진입 경로에서 난다.
  */
-const INIT_SESSION =
-  '(function(){try{var s=new URLSearchParams(location.search).get("s");' +
-  'document.documentElement.dataset.session=s==="am"?"am":"pm"}catch(e){}})()';
-
 /**
  * 발행된 날짜를 빌드 때 미리 굽는다. 78회차에 질의 한 번이라 빌드 시간이 거의 안 는다.
  *
@@ -72,30 +68,5 @@ export default async function BriefPage({ params }: Params) {
   const items = await load(date);
   if (!items.length) notFound();
 
-  const sessions = items.map((i) => i.brief.session);
-
-  // 회차가 하나뿐인 날은 탭도 스크립트도 필요 없다. 감싸는 div도 두지 않는다
-  if (items.length === 1) {
-    const only = items[0];
-    return <BriefView brief={only.brief} sessions={sessions} topics={only.topics} />;
-  }
-
-  return (
-    <>
-      <script dangerouslySetInnerHTML={{ __html: INIT_SESSION }} />
-      {items.map((it) => (
-        <div key={it.brief.session} className={`ses ses--${it.brief.session}`}>
-          <BriefView
-            brief={it.brief}
-            sessions={sessions}
-            topics={it.topics}
-            // 두 회차가 이 문서에 다 구워져 있다. 탭이 주소만 바꾸고 CSS가 뒤집는다
-            inlineSessions
-            // 두 회차가 한 문서에 있다. 접두어가 없으면 `#news`가 둘이 된다
-            idPrefix={it.brief.session === "pm" ? "" : `${it.brief.session}-`}
-          />
-        </div>
-      ))}
-    </>
-  );
+  return <BriefDay items={items} basePath={`/brief/${date}`} />;
 }

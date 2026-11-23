@@ -14,6 +14,7 @@ import { scan } from "./guard";
 import { isRegistryName } from "./registry";
 import { SESSION_LABEL, type Session } from "./queries";
 import { SITE_NAME, SITE_URL } from "./site";
+import { displayLabel } from "./labels";
 
 /** 텔레그램 한 통의 상한은 4096자다. 서식 태그까지 세므로 여유를 둔다. */
 const CHUNK = 3500;
@@ -189,7 +190,7 @@ export function compose(
      */
     const body = rows.map((l) => {
       plain.push(l.text);
-      return l.label ? `<i>▸ ${esc(l.label)}</i>\n${esc(l.text)}` : esc(l.text);
+      return l.label ? `<i>▸ ${esc(displayLabel(l.label))}</i>\n${esc(l.text)}` : esc(l.text);
     });
     blocks.push([lead, head.join("\n"), ...body].join("\n\n"));
   }

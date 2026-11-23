@@ -25,19 +25,39 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-const ENTER_MS = 360;
+export const ENTER_MS = 360;
 const EXIT_MS = 220;
 const SNAP_BACK_MS = 250;
-const ENTER_EASING = "cubic-bezier(0.32, 0.72, 0, 1)";
+export const ENTER_EASING = "cubic-bezier(0.32, 0.72, 0, 1)";
 const EXIT_EASING = "cubic-bezier(0.4, 0, 1, 1)";
 const SNAP_BACK_EASING = "cubic-bezier(0.25, 0.46, 0.45, 0.94)";
-const OFFSCREEN = "translateY(100%)";
+export const OFFSCREEN = "translateY(100%)";
 const GHOST_CLICK_BLOCK_MS = 400;
 const INTERACTABLE_DELAY_MS = 500;
 const DRAG_CLOSE_OFFSET_PX = 100;
 const DRAG_CLOSE_VELOCITY = 500; // px/s
 const OVERLAY_FADE_RATIO = 0.6;
-const DESKTOP_MQ = "(min-width: 768px)";
+export const DESKTOP_MQ = "(min-width: 768px)";
+
+/**
+ * 로딩 틀(`@modal/(.)[code]/loading.tsx`)이 이미 시트를 올려 둔 시각. 본문이 오면 이 값을 보고
+ * 열기 애니메이션을 건너뛴다 — 안 그러면 틀이 올라온 뒤 진짜 시트가 한 번 더 올라와 두 번 열린다.
+ */
+export const SHELL_FLAG = "__stockModalShellAt";
+const SHELL_FRESH_MS = 15_000;
+
+/**
+ * 로딩 틀이 방금 떠 있었나. **읽을 때 지우지 않는다** — 개발 모드(StrictMode)는 effect를 두 번 돌려서
+ * 첫 번째가 지우면 두 번째가 애니메이션을 다시 걸었다. 팝업이 닫힐 때 `clearShellFlag`로 지운다.
+ */
+function hasShellFlag(): boolean {
+  const at = (window as unknown as Record<string, number | undefined>)[SHELL_FLAG];
+  return typeof at === "number" && Date.now() - at < SHELL_FRESH_MS;
+}
+
+function clearShellFlag() {
+  (window as unknown as Record<string, number | undefined>)[SHELL_FLAG] = undefined;
+}
 
 /** el부터 시트까지 세로 스크롤 상자를 모은다. 터치 시작에 한 번만 부른다(touchmove마다 부르면 iOS가 버벅인다) */
 function verticalScrollers(el: HTMLElement | null, root: HTMLElement): HTMLElement[] {
@@ -153,6 +173,8 @@ export default function StockModal({
     const sheet = sheetRef.current;
     const overlay = overlayRef.current;
     if (!sheet || !overlay || typeof sheet.animate !== "function") return;
+    // 로딩 틀이 이미 같은 자리에 시트를 올려 두었다. 그대로 이어받는다
+    if (hasShellFlag()) return;
     const timing: KeyframeAnimationOptions = { duration: ENTER_MS, easing: ENTER_EASING, fill: "backwards" };
     const s = isDesktop
       ? sheet.animate([{ transform: "translateY(12px)", opacity: 0 }, { transform: "translateY(0)", opacity: 1 }], timing)
@@ -166,6 +188,14 @@ export default function StockModal({
       if (anims.current.includes(s)) cancelAnims();
     };
   }, [open, isDesktop, setY, cancelAnims]);
+
+  // 닫히면(주소가 이 종목을 떠나면) 로딩 틀 표식을 지운다. 다음 팝업은 제 애니메이션으로 연다
+  useEffect(() => {
+    if (open) return;
+    clearShellFlag();
+  }, [open]);
+  // 언마운트 정리에서는 지우지 않는다. StrictMode의 가짜 언마운트가 지워 버려 다시 마운트될 때 두 번 열렸다.
+  // 남은 표식은 SHELL_FRESH_MS가 지나면 저절로 무시된다
 
   // 열린 직후에는 끌기를 받지 않는다
   useEffect(() => {
@@ -235,7 +265,8 @@ export default function StockModal({
       body.style.position = prev.position;
       body.style.top = prev.top;
       body.style.width = prev.width;
-      if (scrollY > 0) window.scrollTo(0, scrollY);
+      // html의 scroll-behavior: smooth가 여기에도 걸려 화면이 위에서 흘러내렸다. 즉시 돌려놓는다
+      if (scrollY > 0) window.scrollTo({ top: scrollY, behavior: "instant" });
       document.removeEventListener("touchstart", onStart);
       document.removeEventListener("touchmove", onMove);
     };

@@ -607,6 +607,7 @@ function Scatter({ items }: { items: ExplorerItem[] }) {
               <Link
                 key={p.code}
                 href={`/stocks/${p.code}`}
+                scroll={false}
                 onMouseEnter={() => setHover(p)}
                 onMouseLeave={() => setHover(null)}
                 onFocus={() => setHover(p)}
@@ -672,6 +673,9 @@ const QUADS: Array<{ key: string; label: string; test: (s: ExplorerItem) => bool
   { key: "dd", label: "실적 감소, 주가 하락", test: (s) => s.opYoy! < 0 && s.chg3m! < 0 },
 ];
 
+/** 사분면 한 칸에 처음 보여 줄 종목 수. 넘치면 "외 N" 단추로 편다 (2026-11-23 개편) */
+const QUAD_PEEK = 8;
+
 function Quadrants({
   pts,
   onHover,
@@ -679,10 +683,14 @@ function Quadrants({
   pts: ExplorerItem[];
   onHover: (s: ExplorerItem | null) => void;
 }) {
+  // 한 칸에 39종목이 몰리면 휴대폰 한 화면이 이름으로 찬다. 처음에는 몇 개만 보이고 편다
+  const [open, setOpen] = useState<Record<string, boolean>>({});
   return (
     <dl className="stx-quads">
       {QUADS.map((q) => {
         const list = pts.filter(q.test);
+        const shown = open[q.key] ? list : list.slice(0, QUAD_PEEK);
+        const rest = list.length - shown.length;
         return (
           <div key={q.key} className="stx-quad-row">
             <dt>
@@ -690,10 +698,11 @@ function Quadrants({
             </dt>
             <dd>
               {list.length
-                ? list.map((s) => (
+                ? shown.map((s) => (
                     <Link
                       key={s.code}
                       href={`/stocks/${s.code}`}
+                      scroll={false}
                       onMouseEnter={() => onHover(s)}
                       onMouseLeave={() => onHover(null)}
                     >
@@ -701,6 +710,11 @@ function Quadrants({
                     </Link>
                   ))
                 : <span className="stx-tip-faint">없음</span>}
+              {rest > 0 ? (
+                <button type="button" className="stx-quad-more" onClick={() => setOpen((o) => ({ ...o, [q.key]: true }))}>
+                  외 {rest}
+                </button>
+              ) : null}
             </dd>
           </div>
         );
@@ -724,7 +738,7 @@ function Cards({ items }: { items: ExplorerItem[] }) {
         const patched = s.patched ? `${s.patched.on.slice(5).replace("-", ".")} 공시 반영` : null;
         return (
           <li key={s.code}>
-            <Link href={`/stocks/${s.code}`} className="stx-card">
+            <Link href={`/stocks/${s.code}`} scroll={false} className="stx-card">
               <span className="stx-card-sector">{s.sector}</span>
               <span className="stx-card-name">{s.name}</span>
               <span className="stx-card-price">
@@ -875,7 +889,8 @@ function Table({
   const cols = COLS[view].filter((c) => !(usd && FLOW_ONLY_KRW.has(c.label)));
   return (
     <>
-      <div className="stk-table">
+      {/* stk-table--list: 휴대폰에서는 줄마다 카드로 펴서 각 값 앞에 열 이름(data-label)을 단다 (globals.css) */}
+      <div className="stk-table stk-table--list">
         <table>
           <thead>
             <tr>
@@ -907,13 +922,13 @@ function Table({
             {items.map((s) => (
               <tr key={s.code}>
                 <th scope="row">
-                  <Link href={`/stocks/${s.code}`}>{s.name}</Link>
+                  <Link href={`/stocks/${s.code}`} scroll={false}>{s.name}</Link>
                   <small className="row-sub">{s.sector}</small>
                 </th>
                 {cols.map((c) => {
                   const t = c.tone ? toneOf(c.tone(s)) : "";
                   return (
-                    <td key={c.label} className={`${c.text ? "faint" : "num"} ${t}`}>
+                    <td key={c.label} className={`${c.text ? "faint" : "num"} ${t}`} data-label={c.label}>
                       {c.cell(s)}
                     </td>
                   );

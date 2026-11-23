@@ -25,7 +25,7 @@ export default async function StocksPage() {
 
   if (!week) {
     return (
-      <Shell>
+      <Shell width="wide">
         <header className="masthead">
           <h1 className="page-title">종목 브리핑</h1>
           <StockDisclaimer />

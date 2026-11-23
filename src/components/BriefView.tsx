@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { renderMarkdown, renderText } from "../lib/render";
 import { weekdayKo } from "../lib/date";
+import { displayLabel } from "../lib/labels";
 import { SESSION_LABEL, type Session } from "../lib/queries";
-import SectionRail from "./SectionRail";
 import SessionTabs from "./SessionTabs";
 import Shell from "./Shell";
 
@@ -109,7 +109,7 @@ function Section({
     <section id={id} className={first ? "sec sec--first" : "sec"}>
       <div className="sec-gutter">
         <h2 className="sec-label">
-          {String(ord).padStart(2, "0")} {label}
+          <span className="sec-ord">{String(ord).padStart(2, "0")}</span> {label}
         </h2>
         {note ? <p className="sec-note">{note}</p> : null}
         {link ? (
@@ -128,12 +128,14 @@ function Section({
  * lines는 DB에서 jsonb로 오므로 모양을 믿지 않고 toLines가 한 번 더 확인한다.
  */
 function TopicCard({
+  id,
   ord,
   title,
   impact,
   lines,
   sources,
 }: {
+  id?: string;
   ord: number;
   title: string;
   impact: string;
@@ -141,23 +143,57 @@ function TopicCard({
   sources: SourceLink[];
 }) {
   return (
-    <article className="topic">
+    <article className="topic" id={id}>
       {/* 번호와 배지를 제목 위 한 줄에 따로 둔다. 제목 옆에 붙이면 제목의 일부로 읽힌다. */}
       <div className="topic-head">
         <span className="topic-no">{String(ord).padStart(2, "0")}</span>
         {impact ? <ImpactMeter level={impact} /> : null}
       </div>
-      {/* 원고가 카드 제목을 `[…]`로 감싸는 회차가 있다. 화면에서는 대괄호를 벗긴다
-          (`notify.ts`의 `cardTitle`과 같은 처리). DB 값은 원본 그대로 둔다. */}
-      <h3 className="topic-title">{renderText(title.replace(/^\[(.*)\]$/s, "$1").trim())}</h3>
-      {lines.map((l) => (
-        <p className="topic-line" key={l.label}>
-          <span className="topic-label">{l.label}</span>
-          {renderText(l.text)}
-        </p>
-      ))}
+      <h3 className="topic-title">{renderText(cardTitle(title))}</h3>
+      <TopicLines lines={lines} />
       <SourceList links={sources} />
     </article>
+  );
+}
+
+/** 원고가 카드 제목을 `[…]`로 감싸는 회차가 있다. 화면에서는 벗긴다(`notify.ts`의 `cardTitle`과 같은 처리). DB 값은 원본 그대로 둔다. */
+function cardTitle(t: string) {
+  return t.replace(/^\[(.*)\]$/s, "$1").trim();
+}
+
+/** 이 길이 이하인 값("매우 높음", "단기")은 문단 대신 한 줄 요약 칸에 모은다. */
+const FACT_MAX = 12;
+
+/**
+ * 카드 본문 줄.
+ * 핵심 테마의 "시장 관심도 매우 높음", "지속 가능성 단기"처럼 짧은 값이 한 줄씩 차지하면
+ * 카드가 세로로 늘어지고 정작 문장이 묻힌다(2026-11-23 지적). 짧은 값은 위쪽 한 줄에 모은다.
+ */
+function TopicLines({ lines }: { lines: Array<{ label: string; text: string }> }) {
+  const facts = lines.filter((l) => l.text.length <= FACT_MAX);
+  const paras = lines.filter((l) => l.text.length > FACT_MAX);
+  return (
+    <>
+      {facts.length ? (
+        <p className="topic-facts">
+          {facts.map((l) => (
+            <span className="topic-fact" key={l.label}>
+              <span className="topic-fact-label">{displayLabel(l.label)}</span>
+              {renderText(l.text)}
+            </span>
+          ))}
+        </p>
+      ) : null}
+      {/* 항목 이름은 본문 위 제 줄에 둔다. 같은 줄이면 본문과 갈리지 않는다는 지적(2026-11-23).
+          09-15에는 반대로 "작은 제목이 쌓인다"는 지적이 있었는데, 짧은 값을 facts 줄로 모으면서
+          카드당 이름 줄이 한두 개로 줄어 그 문제가 다시 나지 않는다 */}
+      {paras.map((l) => (
+        <div className="topic-line" key={l.label}>
+          <p className="topic-label">{displayLabel(l.label)}</p>
+          <p className="topic-text">{renderText(l.text)}</p>
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -174,7 +210,7 @@ function SourceList({ links, label = "기사" }: { links: SourceLink[]; label?: 
   const seen = new Map<string, number>();
   return (
     <p className="topic-sources">
-      {label ? <span className="topic-label">{label}</span> : null}
+      {label ? <span className="topic-sources-label">{label}</span> : null}
       {links.map((l) => {
         const n = (seen.get(l.label) ?? 0) + 1;
         seen.set(l.label, n);
@@ -281,12 +317,39 @@ export default function BriefView({
     node: React.ReactNode;
   }> = [];
 
+  /*
+   * 톱기사. 헤드라인은 원래 첫 뉴스 카드 제목에서 뽑으므로(extract.ts) 마스트헤드와
+   * 첫 카드가 같은 문장을 두 번 보여 줬다. 그 카드의 본문을 헤드라인 밑으로 올리고
+   * 목록에서는 뺀다. 헤드라인은 지수 접두부를 뗀 꼬리일 수 있어 끝 일치로 본다(headline.ts).
+   * 헤드라인이 그 카드에서 나온 게 아니면 카드를 목록에 그대로 둔다.
+   */
+  const norm = (t: string) => cardTitle(t).replace(/\s+/g, " ");
+  const topNews = topics.find((t) => t.kind === "news");
+  const top =
+    topNews &&
+    toLines(topNews.lines).length > 0 &&
+    norm(brief.headline).length >= 4 &&
+    norm(topNews.title).endsWith(norm(brief.headline))
+      ? { ...topNews, lines: toLines(topNews.lines), sources: toSources(topNews.sources) }
+      : null;
+
+  /* "이 회차 한눈에" 색인. 카드 제목만 모아 첫 화면에서 훑고 눌러 내려가게 한다 */
+  const index: Array<{ href: string; kind: string; title: string; impact: string }> = [];
+
   for (const b of TOPIC_BLOCKS) {
     const items = topics
-      .filter((t) => t.kind === b.kind)
+      .filter((t) => t.kind === b.kind && !(top && t === topNews))
       .map((t) => ({ ...t, lines: toLines(t.lines), sources: toSources(t.sources) }))
       .filter((t) => t.lines.length);
     if (!items.length) continue;
+    items.forEach((t, i) =>
+      index.push({
+        href: `#${idPrefix}${b.id}-${i + 1}`,
+        kind: b.label,
+        title: cardTitle(t.title),
+        impact: t.impact,
+      }),
+    );
     blocks.push({
       id: b.id,
       label: b.label,
@@ -295,6 +358,7 @@ export default function BriefView({
           {items.map((t, i) => (
             <TopicCard
               key={`${t.rank}-${t.title}`}
+              id={`${idPrefix}${b.id}-${i + 1}`}
               ord={i + 1}
               title={t.title}
               impact={t.impact}
@@ -383,14 +447,7 @@ export default function BriefView({
   const posted = postedLabel(brief.publishedAt, brief.tradeDate);
 
   return (
-    <Shell
-      rail={
-        <SectionRail
-          items={blocks.map((b) => ({ id: `${idPrefix}${b.id}`, label: b.label }))}
-          meta={dotted(brief.tradeDate)}
-        />
-      }
-    >
+    <Shell>
       <header className="masthead">
         <div className="masthead-row">
           <span className="date-xl">{dotted(brief.tradeDate)}</span>
@@ -403,12 +460,43 @@ export default function BriefView({
         {/* 회차와 게시 시각만 찍는다. 원고 작성 시각은 사용자 지시로 뺐다(2026-09-17).
             값은 daily_brief.written_at에 계속 쌓이므로 되살리려면 여기만 되돌리면 된다. */}
         <p className="edition">
-          <span>{SESSION_LABEL[brief.session]}</span>
+          {/* 회차 스위치가 있으면 켜진 칸이 회차 이름이라 여기서 다시 적지 않는다 */}
+          {sessions.length > 1 ? null : <span>{SESSION_LABEL[brief.session]}</span>}
           {posted ? <span>{posted}</span> : null}
         </p>
 
+        {top?.impact ? (
+          <div className="top-impact">
+            <ImpactMeter level={top.impact} />
+          </div>
+        ) : null}
         <h1 className="headline">{renderText(brief.headline)}</h1>
+        {top ? (
+          <div className="top-story">
+            <TopicLines lines={top.lines} />
+            <SourceList links={top.sources} />
+          </div>
+        ) : null}
       </header>
+
+      {index.length > 1 ? (
+        <nav className="brief-index" aria-label="이 회차 한눈에">
+          <p className="brief-index-title">이 회차 한눈에</p>
+          <ol>
+            {index.map((it) => (
+              <li key={it.href}>
+                <a href={it.href}>
+                  <span className="brief-index-kind">{it.kind}</span>
+                  <span className="brief-index-text">{renderText(it.title)}</span>
+                  {it.impact === "매우 큼" || it.impact === "큼" ? (
+                    <span className="brief-index-hot">영향 {it.impact}</span>
+                  ) : null}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      ) : null}
 
       {blocks.map((b, i) => (
         <Section

@@ -119,6 +119,6 @@ test("이미 '시장 영향'으로 시작하면 두 번 붙이지 않는다", ()
 
 test("항목 이름은 제 줄을 잡아 본문과 가르고, 굵게는 카드 제목에만 쓴다", () => {
   const { chunks } = compose(base, [card("반도체 수출 증가", "수출이 늘었다")]);
-  assert.ok(whole(chunks).includes("<i>▸ 무슨 일인가</i>\n수출이 늘었다"));
-  assert.ok(!whole(chunks).includes("<b>무슨 일인가</b>"), "항목 이름은 굵게 쓰지 않는다");
+  assert.ok(whole(chunks).includes("<i>▸ 요약</i>\n수출이 늘었다"));
+  assert.ok(!whole(chunks).includes("<b>요약</b>"), "항목 이름은 굵게 쓰지 않는다");
 });

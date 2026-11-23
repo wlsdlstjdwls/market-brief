@@ -90,7 +90,6 @@ export default function StockWeekView({
   const d = weekdayKo(week.runDate);
   const parts = week.summary ? summaryParts(week.summary) : [];
   const isLatest = weeks[0] === week.runDate;
-  const patchedCount = week.cards.filter((c) => c.patched).length;
 
   const toc: Array<[string, string]> = [
     ["stx-overview", "한눈에"],
@@ -101,7 +100,7 @@ export default function StockWeekView({
   if (weeks.length > 1) toc.push(["stx-weeks", "지난 회차"]);
 
   return (
-    <Shell>
+    <Shell width="wide">
       <header className="masthead stx-masthead">
         <div className="masthead-row">
           <h1 className="page-title">종목 브리핑</h1>
@@ -113,12 +112,8 @@ export default function StockWeekView({
         </div>
         {/* 갱신 주기, 종목 수, 수집 시각을 적던 줄은 지웠다(2026-11-19 사용자 지시).
             장중가 표시(asof)는 카드의 주가 옆에 남아 있다 */}
-        {patchedCount ? (
-          <p className="stx-patched-note">
-            회차 이후 새 공시가 나온 {patchedCount}종목은 평일 21시에 다시 수집해 반영했습니다(카드의
-            &quot;공시 반영&quot; 표시). 아래 &quot;이번 주 요약&quot; 글은 토요일 기준입니다.
-          </p>
-        ) : null}
+        {/* "회차 이후 새 공시 … 토요일 기준입니다" 안내 줄은 2026-11-23 사용자 지시로 지웠다.
+            어느 종목이 갱신됐는지는 카드의 "공시 반영" 꼬리표가 알려 준다 */}
         <StockDisclaimer />
       </header>
 
