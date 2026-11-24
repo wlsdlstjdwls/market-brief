@@ -1299,6 +1299,16 @@ KRX 휴장일은 연초에 확정 공시되므로 미리 구워도 정확도를 
 종목 브리핑에 사분면 매트릭스 4칸, 요약 숫자 0건, 추가한 관심종목(SK스퀘어 등), 종목 상세에 최근 뉴스, `noindex` 유지.
 관심종목 7개 추가는 `claude-instructions` 커밋 `93c45a6`으로 푸시했다(원고 루틴과 토요일 수집이 읽는다).
 
+### 배포 (2026-11-24 차트)
+
+커밋 `0ad432d`(지수, 종목 차트 + 거래대금, 수급, 신용잔고 + 오류 화면)를 `vercel deploy --prod`로 올렸다.
+검증: `npm test` 98건, `npm run typecheck`, `npm run build` 통과. 라이브 확인 — `/`, `/stocks`, `/stocks/005930`,
+`/stocks/NVDA`, `/archive` 200, 없는 날짜 404, `/api/quotes` 지수 캔들, 지수 수급(2,500일) + 신용잔고(2,600일),
+종목 캔들, 종목 수급 전부 200(다음 금융, 네이버가 Vercel 서버에서도 받아진다). 푸터에 TradingView 표기, `noindex` 유지.
+- **이 PC는 git 사용자가 저장소 소유자와 달라 `dubious ownership`으로 막힌다.** 전역 설정을 바꾸지 말고
+  `git -c safe.directory=C:/Users/cware/유튜브분석/심플관심종목TV/market-brief ...`로 그 명령에만 예외를 준다.
+- `npm run build`는 개발 서버와 같은 `.next`를 쓴다. 빌드 전에 `next dev`를 끈다.
+
 ### 같은 날 고친 적재 버그 둘
 
 - **카드와 국내 시장 문단이 두 번씩 실렸다**(11-23 마감판). 원고 루틴이 `일일리포트.md`의 섹션을 `시황.md`에
