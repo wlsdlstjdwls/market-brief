@@ -10,7 +10,12 @@
  * 탐지 대상
  *   1) 6자리 종목코드            예) 005930
  *   2) KRX 상장 종목명 사전       data/ticker_names.json (2,875종목)
- *   3) 개별 종목 지목 표현        관련주 · 수혜주 · 목표주가 ...
+ *   3) 개별 종목 지목 표현        관련주, 수혜주, 목표주가 ...
+ *   4) 해외 기업의 시세 표기      "엔비디아 +2.54%", 해외 기업 셋 이상 나열
+ *
+ * 해외 기업명 자체는 막지 않는다 (2026-11-24, 사용자 결정 A안).
+ * "엔비디아 CEO 복귀" 같은 사건 기사의 주어는 뉴스다. 막는 것은 그 이름에 붙은
+ * 등락률과 종목 나열이다. 국내 종목은 이름만 나와도 그대로 막는다.
  */
 
 import tickerNames from "../../data/ticker_names.json";
@@ -66,11 +71,21 @@ const HANGUL_ALIASES = [
 ];
 
 /**
- * 해외 종목.
+ * 해외 기업.
  *
  * 사전(`data/ticker_names.json`)은 KRX 상장 종목만 담는다. 그래서 "마이크로소프트 +1.52%,
- * 애플 +1.38%, 엔비디아 +2.54%" 같은 미국 종목 줄이 그대로 통과했다(2026-09-18 아침판에서
- * 실제로 새어 나갔다). 개별 종목을 안 쓴다는 약속에 국적은 상관이 없으므로 여기서 막는다.
+ * 애플 +1.38%, 엔비디아 +2.54%" 같은 미국 종목 줄이 그대로 통과했다(2026-09-18 아침판).
+ * 그 뒤로 이 목록의 이름은 나오기만 해도 막았는데, 그러면 "엔비디아 CEO 복귀"처럼
+ * 시장 전체를 흔드는 사건 기사가 통째로 빠진다(2026-11-24 사용자 지적).
+ *
+ * 지금 기준 (A안):
+ *   - 이름만 나오면 통과한다. 사건 기사의 주어다.
+ *   - 이름 뒤 같은 구절에 등락률이 붙으면 막는다 (`pricedAfter`).
+ *   - 같은 문장에 부호 붙은 %와 시세 낱말이 있으면 막는다 (`pricedSentence`).
+ *   - 한 줄에 셋 이상 나열되면 막는다 (`GLOBAL_LIST_MIN`). 시세판이다.
+ *   - "주도 종목" 같은 나열 라벨, 관련주/수혜주, 목표주가는 지금처럼 막는다.
+ *
+ * 국내 종목은 여기 해당하지 않는다. 이름만 나와도 막는다.
  *
  * `exclude`는 그 표기로 시작하는 보통명사. "애플리케이션", "메타버스", "인텔리전스"처럼
  * 종목이 아닌 단어까지 문단을 통째로 버리는 것을 막는다. 뒤에 이어지는 글자로 판정한다.
@@ -119,6 +134,10 @@ const GLOBAL_EQUITIES: GlobalEquity[] = [
   { term: "닌텐도" }, { term: "소프트뱅크" }, { term: "도요타" }, { term: "토요타" },
   { term: "패스트리테일링" }, { term: "어드반테스트" }, { term: "도쿄일렉트론" },
   { term: "웨스팅하우스" }, { term: "Westinghouse" },
+  // AI 인프라, 신규 상장 (2026-11 원고에 자주 나온다)
+  { term: "네비우스" }, { term: "슈퍼마이크로" }, { term: "코어위브" }, { term: "아이렌" },
+  { term: "앤트로픽" }, { term: "루멘텀" }, { term: "스페이스X" }, { term: "HPE" },
+  { term: "델 테크놀로지스" }, { term: "Arm", exclude: /^[a-z]/ },
 ];
 
 /**
@@ -132,6 +151,67 @@ const EQUITY_LABEL_RES: RegExp[] = [
   /최선호주|차선호주/g,
   /(탑|톱)\s*픽|top\s*pick/gi,
 ];
+
+/**
+ * 해외 기업명 뒤 같은 구절 안의 등락률. "엔비디아 +2.54%", "엔비디아(+2.5%)",
+ * "엔비디아가 3% 급등", "인텔 하루 -28.58%", "알파벳 실적 쇼크 12~13% 급락".
+ * 구절은 쉼표, 줄표(—), 줄바꿈에서 끊는다. 이름 뒤 `PRICE_WINDOW`자만 본다.
+ *
+ * "엔비디아 3분기 매출 1,158억달러(+103%)"처럼 실적 숫자의 증감률은 시세가 아니다.
+ * 숫자 앞에 `METRIC_RE` 말이 있으면 그 숫자는 실적으로 본다.
+ */
+const PRICE_WINDOW = 24;
+const SIGNED_PCT_RE = /[+\-−▲▼△▽]\s?\d+(?:\.\d+)?\s?%/;
+const MOVE_PCT_RE =
+  /\d+(?:\.\d+)?\s?%\s*(?:상승|하락|급등|급락|올랐|오른|내렸|내린|떨어|뛰었|뛴|밀렸|빠졌|폭등|폭락|강세|약세)/;
+const METRIC_RE = /매출|이익|영업|가이던스|성장률|증가율|수출|점유율|마진|EPS/;
+const CLAUSE_END_RE = /[,，。;\n—–]|\s-\s/;
+
+function pricedAfter(text: string, end: number): boolean {
+  const clause = text.slice(end, end + PRICE_WINDOW).split(CLAUSE_END_RE)[0];
+  for (const re of [SIGNED_PCT_RE, MOVE_PCT_RE]) {
+    const m = clause.match(re);
+    if (m && !METRIC_RE.test(clause.slice(0, m.index))) return true;
+  }
+  return false;
+}
+
+/**
+ * 등락률이 이름과 떨어져 있어도 같은 문장이면 시세다.
+ * "젠슨 황, 엔비디아 CEO 사임 — 주가 장중 -14% → 종가 -4.34%",
+ * "AMD 3분기 매출 … — 시간외 +6~8%", "방어주 강세 — 헬스케어 +1.84%, 나이키, 홈디포".
+ * 문장 = 줄바꿈 또는 "다. " 사이. 해외 기업명 + 부호 붙은 % + 시세 낱말이 다 있으면 막는다.
+ * 실적 증감률("매출 …(+12%)")은 시세 낱말이 없어 통과한다.
+ */
+const PRICE_WORD_RE =
+  /주가|시간외|장중|종가|정규장|낙폭|신저가|신고가|급등|급락|폭등|폭락|강세|약세|상승|하락|올랐|내렸|시총|시가총액/;
+const SENTENCE_SPLIT_RE = /\n|(?<=[다요])\.(?=\s|$)/;
+
+function sentenceOf(text: string, i: number): string {
+  let from = 0;
+  for (const part of text.split(SENTENCE_SPLIT_RE)) {
+    const start = text.indexOf(part, from);
+    const end = start + part.length;
+    if (i >= start && i < end) return part;
+    from = end;
+  }
+  return "";
+}
+
+/** "종가 165.05달러", "주가는 3,000원" — 등락률이 없어도 주가 수준이다. */
+const PRICE_LEVEL_RE = /(?:주가|종가|장중|시간외|정규장)[은는이가도]?\s*(?:최고\s*|최저\s*)?[\d,.]+\s*(?:달러|원|엔|위안)/;
+
+function pricedSentence(text: string, i: number): boolean {
+  const s = sentenceOf(text, i);
+  if (PRICE_LEVEL_RE.test(s)) return true;
+  return /[+\-−▲▼△▽]\s?\d+(?:\.\d+)?(?:~\d+(?:\.\d+)?)?\s?%/.test(s) && PRICE_WORD_RE.test(s);
+}
+
+const GLOBAL_PRICE_NOTE = "해외 기업 시세";
+const GLOBAL_LIST_NOTE = "해외 기업 나열";
+
+/** 한 줄에 해외 기업이 이만큼 나오면 시세 나열로 본다. */
+const GLOBAL_LIST_MIN = 3;
 
 /** 앞뒤가 숫자가 아닌 6자리 숫자만 종목코드로 본다. */
 const CODE_RE = /(?<![0-9])[0-9]{6}(?![0-9])/g;
@@ -147,6 +227,8 @@ interface Term {
   term: string;
   lower: string;
   rule: "name" | "phrase";
+  /** 해외 기업. 이름만으로는 막지 않는다 */
+  global?: boolean;
   /** 뒤에 이 패턴이 붙으면 종목이 아니다 (애플리케이션, 인텔리전스 …) */
   exclude?: RegExp;
 }
@@ -176,7 +258,9 @@ export function buildTerms(): Term[] {
   for (const g of GLOBAL_EQUITIES) {
     if (seen.has(g.term)) continue;
     seen.add(g.term);
-    out.push({ term: g.term, lower: g.term.toLowerCase(), rule: "name", exclude: g.exclude });
+    out.push({
+      term: g.term, lower: g.term.toLowerCase(), rule: "name", exclude: g.exclude, global: true,
+    });
   }
 
   for (const p of EQUITY_PHRASES) {
@@ -274,6 +358,8 @@ export function scan(text: string): ScanResult {
     }
   }
 
+  const globals: Array<{ start: number; end: number; verdict: { severity: Severity; note?: string } }> = [];
+
   for (const term of buildTerms()) {
     let from = 0;
     for (;;) {
@@ -284,6 +370,12 @@ export function scan(text: string): ScanResult {
       if (overlaps(idx, end)) continue;
       const verdict = classify(text, idx, end, term);
       if (!verdict) continue;
+      if (term.global) {
+        // 자리는 잡아 둔다. 안 그러면 이름 안의 짧은 국내 종목명이 대신 걸린다.
+        taken.push([idx, end]);
+        globals.push({ start: idx, end, verdict });
+        continue;
+      }
       const { severity, note } = verdict;
       taken.push([idx, end]);
       violations.push({
@@ -293,10 +385,62 @@ export function scan(text: string): ScanResult {
     }
   }
 
+  /*
+   * 해외 기업: 이름 자체는 통과. 등락률이 붙었거나 한 줄에 셋 이상 나열됐을 때만 막는다.
+   * 경계가 애매한 것(review)은 이름만 나온 경우라 따로 세지 않는다.
+   */
+  const lineOf = (i: number) => text.slice(0, i).split("\n").length;
+  const perLine = new Map<number, Set<string>>();
+  for (const g of globals) {
+    if (g.verdict.severity !== "block") continue;
+    const line = lineOf(g.start);
+    const set = perLine.get(line) ?? new Set<string>();
+    set.add(text.slice(g.start, g.end).toLowerCase());
+    perLine.set(line, set);
+  }
+  for (const g of globals) {
+    if (g.verdict.severity !== "block") continue;
+    const priced = pricedAfter(text, g.end) || pricedSentence(text, g.start);
+    const listed = (perLine.get(lineOf(g.start))?.size ?? 0) >= GLOBAL_LIST_MIN;
+    if (!priced && !listed) continue;
+    violations.push({
+      match: text.slice(g.start, g.end), rule: "name", severity: "block",
+      start: g.start, end: g.end, context: contextOf(text, g.start, g.end),
+      note: priced ? GLOBAL_PRICE_NOTE : GLOBAL_LIST_NOTE,
+    });
+  }
+
   violations.sort((a, b) => a.start - b.start);
   const blocking = violations.filter((v) => v.severity === "block");
   const review = violations.filter((v) => v.severity === "review");
   return { ok: blocking.length === 0, violations, blocking, review };
+}
+
+/**
+ * 해외 기업 시세 때문에만 걸린 문장을 빼고 나머지를 돌려준다.
+ *
+ * "엔비디아 CEO 복귀" 카드의 본문에 "엔비디아 종가 165.05달러는 …" 한 문장이 섞이면
+ * 카드나 문단을 통째로 버리는 대신 그 문장만 뺀다. 국내 종목, 코드, 지목 표현이
+ * 하나라도 섞인 문장은 손대지 않고 남겨 두므로 호출부의 검사에서 그대로 걸린다.
+ */
+export function stripGlobalPriceSentences(text: string): string {
+  if (!text) return text;
+  const isGlobalOnly = (v: Violation) =>
+    v.note === GLOBAL_PRICE_NOTE || v.note === GLOBAL_LIST_NOTE;
+  const parts = text.split(/(\n|(?<=[다요])\.(?=\s|$))/);
+  const out: string[] = [];
+  for (let i = 0; i < parts.length; i += 2) {
+    const sentence = parts[i];
+    const sep = parts[i + 1] ?? "";
+    const v = scan(sentence).violations;
+    if (v.length && v.every(isGlobalOnly)) {
+      // 문장과 그 끝의 마침표를 같이 뺀다. 줄바꿈은 남긴다.
+      if (sep === "\n") out.push(sep);
+      continue;
+    }
+    out.push(sentence + sep);
+  }
+  return out.join("").replace(/^\s+/, "").replace(/[ \t]{2,}/g, " ").trim();
 }
 
 export class EquityMentionError extends Error {

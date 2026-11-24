@@ -217,3 +217,92 @@ test("머리 고지 인용문은 산문에서 걷는다", () => {
   const p = buildPayload({ "일일리포트.md": md }, "2026-11-23", "run-0740", undefined, "am");
   assert.equal(p.marketSummary, "");
 });
+
+/*
+ * 2026-11-24 A안: 해외 기업명은 사건 기사의 주어로 허용한다.
+ * 막는 것은 등락률이 붙은 경우와 시세판처럼 셋 이상 나열한 경우다.
+ */
+test("해외 기업이 주어인 사건 기사는 통과한다", () => {
+  for (const s of [
+    "엔비디아 CEO 복귀, AI 투자 심리에 영향",
+    "엔비디아, 3분기 매출 20% 증가",
+    "애플과 구글의 반독점 소송 판결",
+    "TSMC 미국 공장 증설 발표",
+  ]) {
+    assert.equal(scan(s).violations.length, 0, s);
+  }
+});
+
+test("해외 기업에 등락률이 붙으면 막는다", () => {
+  for (const s of [
+    "엔비디아 +2.54% 마감",
+    "엔비디아(+2.5%)",
+    "엔비디아가 3% 급등했다",
+    "테슬라 주가가 5.1% 하락",
+    "Nvidia -1.2%",
+  ]) {
+    assert.ok(scan(s).blocking.length > 0, s);
+  }
+});
+
+test("해외 기업을 한 줄에 셋 이상 나열하면 막는다", () => {
+  assert.ok(scan("마이크로소프트, 애플, 엔비디아 모두 올랐다").blocking.length > 0);
+  // 줄이 다르면 따로 센다
+  assert.equal(scan("엔비디아 발표\n애플 소송\n구글 규제").violations.length, 0);
+});
+
+test("해외 기업과 같이 나와도 국내 종목은 막는다", () => {
+  assert.ok(scan("엔비디아, 네이버에 1.48조원 투자").blocking.some((v) => v.match === "네이버"));
+  assert.ok(scan("엔비디아 CEO 복귀에 SK하이닉스 강세").blocking.length > 0);
+});
+
+test("해외 기업이어도 나열 라벨과 지목 표현은 막는다", () => {
+  assert.ok(scan("주도 종목: 엔비디아").blocking.length > 0);
+  assert.ok(scan("엔비디아 관련주 강세").blocking.length > 0);
+});
+
+test("이름과 등락률 사이에 말이 끼어도 같은 구절이면 막는다", () => {
+  for (const s of [
+    "인텔 하루 -28.58%, 1974년 이후 최대 낙폭",
+    "엔비디아만 -4.27%(장중 -8.79%)",
+    "알파벳 실적 쇼크 12~13% 급락",
+    "네비우스 -16.84%",
+  ]) {
+    assert.ok(scan(s).blocking.length > 0, s);
+  }
+});
+
+test("실적 숫자의 증감률은 시세로 보지 않는다", () => {
+  for (const s of [
+    "엔비디아 3분기 매출 1,158억달러(+103%)",
+    "AMD 3분기 매출 133.8억달러(+45%)",
+    "엔비디아, 시장 전망 +5% 웃돌아",
+  ]) {
+    assert.equal(scan(s).violations.length, 0, s);
+  }
+});
+
+test("같은 문장에 시세가 있으면 이름과 떨어져 있어도 막는다", () => {
+  for (const s of [
+    "젠슨 황, 엔비디아 CEO 사임 — 주가 장중 -14% → 종가 -4.34%",
+    "AMD 3분기 매출 133.8억달러(+45%) — 시간외 +6~8%",
+    "미국 방어주 강세 — 헬스케어 +1.84%, 나이키, 홈디포",
+  ]) {
+    assert.ok(scan(s).blocking.length > 0, s);
+  }
+  // 문장이 다르면 따로 본다
+  assert.equal(scan("엔비디아가 CEO 복귀를 발표했다. 코스피는 +2.1% 상승했다.").violations.length, 0);
+});
+
+test("주가 수준도 해외 기업 시세로 본다", () => {
+  assert.ok(scan("엔비디아 종가 165.05달러는 사임 전날의 95%를 회복했다.").blocking.length > 0);
+});
+
+test("해외 기업 시세 문장만 빼고 나머지는 남긴다", async () => {
+  const { stripGlobalPriceSentences } = await import("../src/lib/guard");
+  const s = "엔비디아 리스크 프리미엄이 하루에 걷혔다. 엔비디아 종가 165.05달러는 전날의 95%를 회복했다.";
+  assert.equal(stripGlobalPriceSentences(s), "엔비디아 리스크 프리미엄이 하루에 걷혔다.");
+  // 국내 종목이 섞인 문장은 그대로 남겨 호출부 검사에 걸리게 한다
+  const k = "엔비디아 종가 165달러. 삼성전자 강세다.";
+  assert.ok(scan(stripGlobalPriceSentences(k)).blocking.some((v) => v.match === "삼성전자"));
+});

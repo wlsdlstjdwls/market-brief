@@ -11,7 +11,7 @@
  * 구조화 수치(지수·지표·업종)는 원문 문자열이 아니라 registry의 표준 명칭으로 저장한다.
  */
 
-import { scan } from "./guard";
+import { scan, stripGlobalPriceSentences } from "./guard";
 import {
   splitSections, parseTables, paragraphs, cleanHeading, dedot, toNumber, toPercent,
   type Section,
@@ -89,7 +89,10 @@ const sectionDenied = (s: Section) =>
 /** 문단 중 종목 언급이 전혀 없는 것만 남긴다. */
 function cleanParagraphs(s: Section, dropped: DroppedBlock[]): string[] {
   const kept: string[] = [];
-  for (const p of paragraphs(s.body)) {
+  for (const raw of paragraphs(s.body)) {
+    // 해외 기업 시세 문장만 빼고 문단은 살린다. 남은 게 없으면 버린다.
+    const p = stripGlobalPriceSentences(raw);
+    if (!p) continue;
     const r = scan(p);
     if (r.violations.length) {
       dropped.push({

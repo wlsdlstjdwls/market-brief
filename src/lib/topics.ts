@@ -15,7 +15,7 @@
  * review 등급도 block과 똑같이 버린다. 놓치는 쪽이 훨씬 위험하다(guard.ts 주석 참고).
  */
 
-import { scan } from "./guard";
+import { scan, stripGlobalPriceSentences } from "./guard";
 import { cleanHeading, dedot, type Section } from "./markdown";
 import { cardSources, type SourceLink } from "./sources";
 import { stripMeta, stripMetaTitle } from "./meta";
@@ -206,7 +206,8 @@ function collect(
 
     const values = spec.fields.map((f) => ({
       label: f.label,
-      text: stripMeta(dedot(field(b.body, f.match))),
+      // 해외 기업 시세 문장은 그 문장만 뺀다. 카드 제목에는 쓰지 않는다(제목은 통째로 판정).
+      text: stripGlobalPriceSentences(stripMeta(dedot(field(b.body, f.match)))),
     }));
     const lead = values[0];
     if (!title || !lead.text) continue; // 이 형식의 카드가 아니거나, 메모뿐인 카드다
