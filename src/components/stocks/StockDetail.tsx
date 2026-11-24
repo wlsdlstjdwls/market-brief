@@ -4,6 +4,7 @@ import Term from "../Term";
 import StockCharts from "./StockCharts";
 import DivJump from "./DivJump";
 import LiveQuote from "./LiveQuote";
+import IndexCandles from "../market/IndexCandles";
 import ExternalIcon from "../ExternalIcon";
 import { classifyDividends, dividendYears, payCycle } from "../../lib/dividends";
 import type { getStockDetail } from "../../lib/stock-queries";
@@ -328,6 +329,10 @@ export default function StockDetail({
           </p>
         ) : null}
       </header>
+
+      {/* 종목 차트: 지수 차트(IndexCandles)를 그대로 쓴다(2026-11-24 사용자 지시). 캔들, 이동평균, 거래대금,
+          외국인/기관 순매수(주), RSI, 확대 축소, 전체화면, 지표 설정까지 같다. 종목별 신용잔고는 원천이 없어 빠진다 */}
+      <IndexCandles indexKey={s.code} name={s.name} kind="stock" />
 
       <div className="sd-tiles">
         {tiles.map((t) => (

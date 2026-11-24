@@ -499,10 +499,6 @@ function Scatter({ items }: { items: ExplorerItem[] }) {
     <figure className="stx-fig" id="stx-scatter">
       <figcaption>
         <h2>실적과 주가</h2>
-        <p>
-          오른쪽일수록 영업이익이 1년 전보다 많이 늘었고, 위쪽일수록 최근 3개월 주가가 올랐습니다.
-          오른쪽 아래는 실적이 늘었는데 주가는 빠진 종목입니다. 점을 누르면 종목 화면으로 갑니다.
-        </p>
       </figcaption>
       <div className="stx-fig-body">
       <div className="stx-plot" ref={wrap}>

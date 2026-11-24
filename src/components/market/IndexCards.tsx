@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import IndexCandles from "./IndexCandles";
 import LineChart from "./LineChart";
 import { getIndices, type IndexQuote } from "./indices-client";
 
@@ -19,7 +20,7 @@ const TODAY = () =>
 
 /** 값이 0.8초 동안 4% 아래에서 굴러 올라와 맞춰진다(M3) */
 function CountUp({ to, delay }: { to: number; delay: number }) {
-  const ref = useRef<HTMLParagraphElement>(null);
+  const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -39,15 +40,16 @@ function CountUp({ to, delay }: { to: number; delay: number }) {
     return () => cancelAnimationFrame(raf);
   }, [to, delay]);
   return (
-    <p ref={ref} className="ixc-price">
+    <span ref={ref} className="ixc-price">
       {NUM.format(to)}
-    </p>
+    </span>
   );
 }
 
 export default function IndexCards({ tradeDate, always = false }: { tradeDate?: string; always?: boolean }) {
   const [items, setItems] = useState<IndexQuote[] | null>(null);
   const [today, setToday] = useState(false);
+  const [pick, setPick] = useState<string | null>(null);
 
   useEffect(() => {
     if (!always && TODAY() !== tradeDate) return;
@@ -60,23 +62,36 @@ export default function IndexCards({ tradeDate, always = false }: { tradeDate?: 
   }, [tradeDate, always]);
 
   if (!today || (items && !items.length)) return null;
+  // 카드를 누르면 아래에 그 지수 차트가 열린다(2026-11-24 사용자 지시)
+  // 처음에는 아무 지수도 고르지 않아 차트를 그리지 않는다(2026-11-24 사용자 지시). 고른 카드를 다시 누르면 닫힌다
+  const sel = items?.find((q) => q.key === pick) ?? null;
   return (
-    <div className="ixc" aria-label="오늘 지수">
-      {(items ?? Array.from({ length: 5 }, () => null)).map((q, i) =>
-        q ? (
-          <div key={q.key} className="ixc-card ixc-card--in" style={{ animationDelay: `${i * 90}ms` }}>
-            <p className="ixc-name">{q.name}</p>
-            <CountUp to={q.price} delay={i * 90} />
-            <p className={`ixc-pct ${q.pct > 0 ? "is-up" : q.pct < 0 ? "is-down" : ""}`}>
-              {q.pct > 0 ? "+" : ""}
-              {q.pct.toFixed(2)}%
-            </p>
-            {q.spark ? <LineChart c={q.spark.c} base={q.spark.base} height={42} draw live={q.open} /> : null}
-          </div>
-        ) : (
-          <div key={i} className="ixc-card ixc-card--empty shimmer" />
-        ),
-      )}
-    </div>
+    <>
+      <div className="ixc" aria-label="오늘 지수">
+        {(items ?? Array.from({ length: 5 }, () => null)).map((q, i) =>
+          q ? (
+            <button
+              key={q.key}
+              type="button"
+              className={`ixc-card ixc-card--in${sel?.key === q.key ? " is-sel" : ""}`}
+              style={{ animationDelay: `${i * 90}ms` }}
+              aria-pressed={sel?.key === q.key}
+              onClick={() => setPick((p) => (p === q.key ? null : q.key))}
+            >
+              <span className="ixc-name">{q.name}</span>
+              <CountUp to={q.price} delay={i * 90} />
+              <span className={`ixc-pct ${q.pct > 0 ? "is-up" : q.pct < 0 ? "is-down" : ""}`}>
+                {q.pct > 0 ? "+" : ""}
+                {q.pct.toFixed(2)}%
+              </span>
+              {q.spark ? <LineChart c={q.spark.c} base={q.spark.base} height={42} draw live={q.open} /> : null}
+            </button>
+          ) : (
+            <div key={i} className="ixc-card ixc-card--empty shimmer" />
+          ),
+        )}
+      </div>
+      {sel ? <IndexCandles indexKey={sel.key} name={sel.name} /> : null}
+    </>
   );
 }

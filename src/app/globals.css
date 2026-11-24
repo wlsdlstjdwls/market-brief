@@ -5482,3 +5482,1340 @@ html:not([data-session="am"]) .ses--am {
   padding: 2px 6px;
   font-size: 12px;
 }
+
+/* 넓은 화면: 매트릭스 높이를 산점도에 맞춘다(2026-11-24 사용자 지적 "높이가 안 맞는다").
+   height 0 + min-height 100%로 매트릭스가 줄 높이를 늘리지 못하게 하고 산점도가 정한 높이를 채운다.
+   칸이 넘치면 칸 안 칩 목록만 스크롤한다 */
+@media (min-width: 1000px) {
+  .stx-fig-body {
+    align-items: stretch;
+  }
+
+  .stx-qx {
+    height: 0;
+    min-height: calc(100% - 14px);
+  }
+
+  .stx-qx-tile {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .stx-qx-chips {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+    align-content: flex-start;
+  }
+}
+
+/* ==========================================================================
+   지수 캔들차트 (2026-11-24 사용자 지시 "과거 지수도 차트로, 캔들차트").
+   지수 카드가 단추가 됐다. 누르면 아래 캔들차트가 그 지수로 바뀐다(IndexCandles.tsx).
+   양봉 빨강, 음봉 파랑(--up, --down, 한국 관례)
+   ========================================================================== */
+button.ixc-card {
+  display: block;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: var(--surface, #fff);
+  cursor: pointer;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.ixc-card > span {
+  display: block;
+}
+
+button.ixc-card:hover {
+  border-color: var(--fg);
+}
+
+button.ixc-card.is-sel {
+  border-color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--fg);
+}
+
+.ixk {
+  margin: 10px 0 0;
+  padding: 14px 16px 10px;
+  border: 1px solid var(--line);
+  background: var(--surface, #fff);
+}
+
+.ixk-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.ixk-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.ixk-head h3 span {
+  margin-left: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--faint);
+}
+
+.ixk-ranges {
+  display: inline-flex;
+  border: 1px solid var(--fg);
+}
+
+.ixk-ranges button {
+  padding: 4px 12px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.ixk-ranges button + button {
+  border-left: 1px solid var(--fg);
+}
+
+.ixk-ranges button.is-on {
+  background: var(--fg);
+  color: #fff;
+}
+
+.ixk-box {
+  margin-top: 8px;
+}
+
+.ixk-box svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: pan-y;
+}
+
+.ixk-sum {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  min-height: 22px;
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.ixk-sum b {
+  font-weight: 800;
+  color: var(--fg);
+}
+
+.ixk-sum .is-up { color: var(--up); }
+.ixk-sum .is-down { color: var(--down); }
+
+.ixk-date {
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.ixk-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.ixk-tick {
+  font-size: 11px;
+  fill: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.ixk-up line { stroke: var(--up); stroke-width: 1; }
+.ixk-up rect { fill: var(--up); }
+.ixk-down line { stroke: var(--down); stroke-width: 1; }
+.ixk-down rect { fill: var(--down); }
+
+.ixk-cross {
+  stroke: var(--faint);
+  stroke-dasharray: 3 3;
+}
+
+.ixk-last {
+  stroke: var(--fg);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  opacity: 0.5;
+}
+
+.ixk-last-tag {
+  fill: var(--fg);
+}
+
+.ixk-last-text {
+  font-size: 11px;
+  font-weight: 700;
+  fill: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.ixk-empty {
+  background: var(--tint);
+}
+
+.ixk-none {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-size: 13px;
+  color: var(--faint);
+}
+
+@media (max-width: 560px) {
+  .ixk {
+    padding: 12px 10px 8px;
+  }
+}
+/* 캔들 2차: 봉 단위 + 기간 두 줄 단추, RSI 판 */
+.ixk-ctrls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+
+.ixk-ranges--sub {
+  border-color: var(--line-strong, #bbb);
+}
+
+.ixk-ranges--sub button {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.ixk-ranges--sub button + button {
+  border-left-color: var(--line-strong, #bbb);
+}
+
+.ixk-ranges--sub button.is-on {
+  background: var(--tint);
+  color: var(--fg);
+  font-weight: 800;
+}
+
+.ixk-rsi {
+  fill: none;
+  stroke: var(--s1, #2563eb);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.ixk-rsi-dot {
+  fill: var(--s1, #2563eb);
+}
+
+.ixk-rsi-frame {
+  fill: none;
+  stroke: var(--line);
+}
+
+.ixk-rsi-line {
+  stroke: var(--faint);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.ixk-rsi-hot {
+  fill: var(--up);
+  opacity: 0.07;
+}
+
+.ixk-rsi-cold {
+  fill: var(--down);
+  opacity: 0.07;
+}
+
+.ixk-rsi-title {
+  font-size: 11px;
+  font-weight: 700;
+  fill: var(--muted);
+}
+/* RSI 과매수(70 이상), 과매도(30 이하) 표기 */
+.ixk-zone {
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ixk-zone--hot { fill: var(--up); }
+.ixk-zone--cold { fill: var(--down); }
+.ixk-zdot--hot, .ixk-zmark--hot { fill: var(--up); }
+.ixk-zdot--cold, .ixk-zmark--cold { fill: var(--down); }
+
+.ixk-zmark--hot,
+.ixk-zmark--cold {
+  opacity: 0.85;
+}
+/* 캔들 3차: 기간 단추 고정(안 맞는 기간은 흐리게), 거래량 판, 과매수/과매도 구간 띠와 이름표 */
+.ixk-ranges--sub button:disabled {
+  color: var(--line-strong, #c8c8c8);
+  cursor: not-allowed;
+}
+
+.ixk-frame {
+  fill: none;
+  stroke: var(--line);
+}
+
+.ixk-panel-title {
+  font-size: 11px;
+  font-weight: 800;
+  fill: var(--muted);
+}
+
+.ixk-vol--up { fill: var(--up); opacity: 0.55; }
+.ixk-vol--down { fill: var(--down); opacity: 0.55; }
+
+.ixk-band--hot { fill: var(--up); opacity: 0.08; }
+.ixk-band--cold { fill: var(--down); opacity: 0.09; }
+
+.ixk-tag-box {
+  stroke-width: 1;
+}
+
+.ixk-tag--hot .ixk-tag-box { fill: var(--up); }
+.ixk-tag--cold .ixk-tag-box { fill: var(--down); }
+
+.ixk-tag-text {
+  font-size: 11px;
+  font-weight: 800;
+  fill: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.ixk-tag-lead {
+  stroke-width: 1.2;
+}
+
+.ixk-tag--hot .ixk-tag-lead { stroke: var(--up); }
+.ixk-tag--cold .ixk-tag-lead { stroke: var(--down); }
+/* 아이콘 범례 (과매수 ▼, 과매도 ▲) */
+.ixk-head h3 .ixk-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.ixk-legend i {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+}
+
+.ixk-legend-hot {
+  border-top: 8px solid var(--up);
+}
+
+.ixk-legend-cold {
+  margin-left: 8px;
+  border-bottom: 8px solid var(--down);
+}
+
+.ixk-zmark--hot,
+.ixk-zmark--cold {
+  opacity: 1;
+}
+/* 지수 차트 4차: lightweight-charts. 진입 표식(시안 I)은 검정 ▼▲ */
+.ixk-legend .ixk-legend-hot { border-top-color: var(--fg); }
+.ixk-legend .ixk-legend-cold { border-bottom-color: var(--fg); }
+
+.ixk-chart {
+  position: relative;
+  margin-top: 4px;
+  touch-action: pan-y;
+}
+
+.ixk-chart.shimmer {
+  background: var(--tint);
+}
+
+.ixk-who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 10px 0 6px;
+  font-size: 12.5px;
+}
+
+.ixk-who > span {
+  margin-right: 4px;
+  font-weight: 800;
+}
+
+.ixk-who button {
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.ixk-who button.is-on {
+  border-color: var(--fg);
+  background: var(--fg);
+  color: #fff;
+}
+
+.ixk-who em {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+.ixk-help {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+.ixk-asof {
+  margin-left: 3px;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--faint);
+}
+/* 지수 차트 5차: 마우스 옆 봉 정보 상자, 순매수 전체 칩 */
+.ixk-chart-wrap {
+  position: relative;
+}
+
+.ixk-chart {
+  cursor: crosshair;
+}
+
+.ixk-tip {
+  position: absolute;
+  z-index: 3;
+  width: 200px;
+  padding: 8px 10px 7px;
+  border: 1px solid var(--fg);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.ixk-tip-date {
+  margin: 0 0 5px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--line);
+  font-weight: 800;
+}
+
+.ixk-tip dl {
+  margin: 0;
+}
+
+.ixk-tip dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  line-height: 1.6;
+}
+
+.ixk-tip dt {
+  color: var(--faint);
+}
+
+.ixk-tip dd {
+  margin: 0;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.ixk-tip dd.is-up { color: var(--up); }
+.ixk-tip dd.is-down { color: var(--down); }
+
+.ixk-tip dd i {
+  margin-left: 4px;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.ixk-who-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 4px;
+  border-radius: 50%;
+  vertical-align: 1px;
+}
+
+@media (hover: none) {
+  /* 휴대폰은 손가락이 가리므로 상자를 위쪽에 고정한다 */
+  .ixk-tip {
+    top: 4px !important;
+    left: 4px !important;
+    width: 180px;
+  }
+}
+.ixk-head h3 .ixk-head-date {
+  margin-left: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+/* ==========================================================================
+   오류 화면 (2026-11-24 리디자인, error.tsx). 흑백, 강조는 검은 단추 하나
+   ========================================================================== */
+.oops {
+  max-width: 560px;
+  margin: 56px auto 72px;
+}
+
+.oops-mark {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 44px;
+  margin: 0 0 22px;
+}
+
+/* 브랜드 마크(세 줄)에서 가운데 줄이 끊긴 모양: "브리핑이 잠깐 끊겼다" */
+.oops-mark span {
+  display: block;
+  height: 6px;
+  background: var(--fg);
+}
+
+.oops-mark span:nth-child(2) {
+  width: 45%;
+  background: var(--line);
+}
+
+.oops-mark span:nth-child(3) {
+  width: 75%;
+}
+
+.oops-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.3;
+}
+
+.oops-lead {
+  margin: 10px 0 0;
+  font-size: 15.5px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.oops-primary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 26px;
+}
+
+.oops-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 132px;
+  height: 46px;
+  padding: 0 20px;
+  border: 1px solid var(--fg);
+  background: var(--fg);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.oops-btn:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.oops-btn--ghost {
+  background: #fff;
+  color: var(--fg);
+}
+
+.oops-btn--ghost:hover {
+  background: var(--tint);
+}
+
+.oops-alt {
+  margin-top: 40px;
+  border-top: 2px solid var(--fg);
+}
+
+.oops-alt-head {
+  margin: 12px 0 4px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--faint);
+}
+
+.oops-alt ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oops-alt li + li {
+  border-top: 1px solid var(--line);
+}
+
+.oops-alt a {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 13px 0;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.oops-alt a b {
+  font-size: 15.5px;
+  font-weight: 800;
+}
+
+.oops-alt a span {
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.oops-alt a:hover b {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.oops-foot {
+  margin: 28px 0 0;
+  font-size: 13px;
+  color: var(--faint);
+}
+
+.oops-foot a {
+  color: var(--fg);
+  font-weight: 700;
+}
+
+.oops-foot code {
+  display: block;
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+@media (max-width: 560px) {
+  .oops {
+    margin: 32px auto 48px;
+  }
+
+  .oops-title {
+    font-size: 23px;
+  }
+
+  .oops-btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+/* 오늘(마지막 영업일) 지표 + 직전 영업일 대비 (2026-11-24 사용자 지시) */
+.ixk-today {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.ixk-today li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 10px;
+  background: var(--tint);
+}
+
+.ixk-today-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--faint);
+}
+
+.ixk-today b {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.ixk-today b.is-up, .ixk-today-diff.is-up { color: var(--up); }
+.ixk-today b.is-down, .ixk-today-diff.is-down { color: var(--down); }
+
+.ixk-today-diff {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+@media (max-width: 560px) {
+  .ixk-today {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* 순매수 필터를 상단 조작 줄로 (단위, 기간 단추와 같은 줄) */
+.ixk-ctrls .ixk-who {
+  margin: 0;
+}
+
+.ixk-ctrls .ixk-who button {
+  padding: 4px 9px;
+}
+/* 차트 전체화면 (브라우저 :fullscreen, 못 쓰는 곳은 .is-full 고정 판) */
+.ixk-full {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 30px;
+  border: 1px solid var(--fg);
+  background: #fff;
+  cursor: pointer;
+}
+
+.ixk-full svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: var(--fg);
+  stroke-width: 1.8;
+}
+
+.ixk-full:hover {
+  background: var(--fg);
+}
+
+.ixk-full:hover svg {
+  stroke: #fff;
+}
+
+.ixk.is-full,
+.ixk:fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 14px 18px 10px;
+  border: 0;
+  background: #fff;
+  overflow: auto;
+}
+
+.ixk:fullscreen::backdrop {
+  background: #fff;
+}
+
+.ixk.is-full .ixk-chart-wrap,
+.ixk:fullscreen .ixk-chart-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* 인라인 높이를 덮어 화면을 채운다. 차트는 autoSize라 저절로 따라 커진다 */
+.ixk.is-full .ixk-chart,
+.ixk:fullscreen .ixk-chart {
+  height: 100% !important;
+  min-height: 420px;
+}
+/* 오류, 404 화면 확정안 (2026-11-24, 시안 5차 E1 + 가운데 정렬). 앞의 .oops-mark 규칙은 쓰지 않는다 */
+.oops {
+  text-align: center;
+}
+
+.oops-icon {
+  display: block;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 20px;
+  color: var(--fg);
+  overflow: visible;
+  animation: oops-pop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+}
+
+.oops-icon-shake {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: oops-shake 0.5s ease-in-out 0.35s both;
+}
+
+@keyframes oops-pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+@keyframes oops-shake {
+  0%, 100% { transform: none; }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+
+.oops-primary {
+  justify-content: center;
+}
+
+.oops-alt a {
+  align-items: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oops-icon,
+  .oops-icon-shake {
+    animation: none;
+  }
+}
+/* ==========================================================================
+   지수 차트 모바일 (2026-11-24 사용자 지시, 키움, 나무, 토스 앱 벤치마킹)
+   - 상자 테두리를 걷고 차트를 꽉 채운다
+   - 조작은 한 줄씩: 순매수 칩 / 단위 + 기간(가로 스크롤, 글자가 꺾이지 않게)
+   - 전체화면 단추는 제목 줄 오른쪽 끝
+   - 오늘 지표는 가로로 넘기는 띠
+   - 정보 상자는 차트 위를 가로지르는 띠(손가락에 안 가리게)
+   ========================================================================== */
+@media (max-width: 740px) {
+  .ixk {
+    position: relative;
+    margin-top: 14px;
+    padding: 12px 0 0;
+    border: 0;
+    border-top: 2px solid var(--fg);
+    background: transparent;
+  }
+
+  .ixk-head {
+    display: block;
+  }
+
+  .ixk-head h3 {
+    padding-right: 40px;
+  }
+
+  .ixk-ctrls {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .ixk-ctrls .ixk-who {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .ixk-ranges,
+  .ixk-ranges--sub {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ixk-ranges::-webkit-scrollbar,
+  .ixk-who::-webkit-scrollbar,
+  .ixk-today::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ixk-ranges button {
+    flex: 0 0 auto;
+    padding: 6px 11px;
+    white-space: nowrap;
+    font-size: 12.5px;
+  }
+
+  /* 단위(일, 주, 월)는 꽉 찬 세그먼트, 기간은 그 아래 한 줄 */
+  .ixk-ctrls > .ixk-ranges:not(.ixk-ranges--sub) {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .ixk-ranges--sub {
+    display: flex;
+  }
+
+  .ixk-ranges--sub button {
+    flex: 1 0 auto;
+    padding: 6px 8px;
+  }
+
+  .ixk-full {
+    position: absolute;
+    top: 10px;
+    right: 0;
+    width: 30px;
+    height: 28px;
+  }
+
+  .ixk-today {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    margin: 10px 0 0;
+  }
+
+  .ixk-today li {
+    flex: 0 0 auto;
+    min-width: 108px;
+    padding: 7px 9px;
+    scroll-snap-align: start;
+  }
+
+  .ixk-today-label {
+    font-size: 11px;
+  }
+
+  .ixk-today b {
+    font-size: 15px;
+  }
+
+  .ixk-today-diff {
+    font-size: 10.5px;
+    white-space: nowrap;
+  }
+
+  .ixk-chart {
+    margin-top: 8px;
+  }
+
+  /* 정보 상자 = 차트 위 띠. 3열로 촘촘하게 */
+  .ixk-tip {
+    top: 0 !important;
+    left: 0 !important;
+    right: 0;
+    width: auto;
+    padding: 6px 8px;
+    border: 0;
+    border-bottom: 1px solid var(--fg);
+    box-shadow: none;
+    font-size: 11px;
+  }
+
+  .ixk-tip-date {
+    margin-bottom: 3px;
+    padding-bottom: 3px;
+  }
+
+  .ixk-tip dl {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 10px;
+  }
+
+  .ixk-tip dl > div {
+    line-height: 1.45;
+  }
+
+  .ixk-tip dd i {
+    display: none;
+  }
+
+  .ixk.is-full,
+  .ixk:fullscreen {
+    padding: 10px 10px 6px;
+  }
+}
+/* 보조 판 켜고 끄기 단추: 켜짐 = 검은 바탕, 꺼짐 = 흰 바탕 + 흐린 글자 + 취소선 없음 */
+.ixk-who button {
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.ixk-who button:not(.is-on) {
+  color: #9e9e9e;
+}
+
+.ixk-who button:not(.is-on) .ixk-who-dot {
+  opacity: 0.35;
+}
+
+.ixk-who button.is-on .ixk-who-dot {
+  box-shadow: 0 0 0 1.5px #fff;
+}
+/* ==========================================================================
+   지표 설정 (2026-11-24, 증권사 앱 방식): "지표" 단추 하나 → 스위치 목록.
+   데스크톱은 단추 아래 작은 창, 휴대폰은 아래에서 올라오는 시트 + 어두운 막
+   ========================================================================== */
+.ixk-ind {
+  position: relative;
+}
+
+.ixk-ind-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--fg);
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.ixk-ind-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: #fff;
+  stroke: var(--fg);
+  stroke-width: 1.6;
+}
+
+.ixk-ind-btn b {
+  min-width: 18px;
+  padding: 0 5px;
+  background: var(--fg);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.ixk-ind-btn.is-open,
+.ixk-ind-btn:hover {
+  background: var(--tint);
+}
+
+.ixk-ind-scrim {
+  display: none;
+}
+
+.ixk-ind-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  width: 290px;
+  padding: 6px 0 8px;
+  border: 1px solid var(--fg);
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+}
+
+.ixk-ind-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  padding: 6px 14px 8px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.ixk-ind-head button {
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--faint);
+  cursor: pointer;
+}
+
+.ixk-ind-panel ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ixk-ind-panel li + li {
+  border-top: 1px solid #f0f0f0;
+}
+
+.ixk-ind-panel label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.ixk-ind-panel label:hover {
+  background: #fafafa;
+}
+
+.ixk-ind-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ixk-ind-txt b {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ixk-ind-txt small {
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+.ixk-ind-sw {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.ixk-ind-sw i {
+  width: 10px;
+  height: 3px;
+}
+
+.ixk-ind-foot {
+  margin: 4px 0 0;
+  padding: 6px 14px 0;
+  font-size: 11px;
+  color: var(--faint);
+}
+
+/* 스위치 (iOS 토글 모양, 켜짐 = 검정) */
+.ixk-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 24px;
+  margin: 0;
+  border-radius: 12px;
+  background: #d4d4d4;
+  cursor: pointer;
+  transition: background-color 0.18s ease;
+}
+
+.ixk-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.18s ease;
+}
+
+.ixk-switch:checked {
+  background: var(--fg);
+}
+
+.ixk-switch:checked::after {
+  transform: translateX(16px);
+}
+
+.ixk-switch:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
+@media (max-width: 740px) {
+  .ixk-ind-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 290;
+    background: rgba(0, 0, 0, 0.4);
+  }
+
+  .ixk-ind-panel {
+    position: fixed;
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 300;
+    width: auto;
+    padding: 8px 0 calc(14px + env(safe-area-inset-bottom));
+    border: 0;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18);
+    animation: ixk-sheet 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .ixk-ind-panel::before {
+    content: "";
+    display: block;
+    width: 36px;
+    height: 4px;
+    margin: 0 auto 8px;
+    border-radius: 2px;
+    background: #d4d4d4;
+  }
+
+  .ixk-ind-panel label {
+    padding: 13px 18px;
+  }
+
+  .ixk-ind-head {
+    padding: 4px 18px 10px;
+    font-size: 16px;
+  }
+
+  .ixk-ind-foot {
+    padding: 6px 18px 0;
+  }
+
+  .ixk-ind-btn {
+    height: 32px;
+  }
+}
+
+@keyframes ixk-sheet {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ixk-ind-panel,
+  .ixk-switch,
+  .ixk-switch::after {
+    animation: none;
+    transition: none;
+  }
+}
+/* 오늘 지표: 카드 → 한 줄 띠 (2026-11-24 사용자 지시). 바탕 없음, 항목 사이 가는 세로선 */
+.ixk-today {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: 10px 0 0;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.ixk-today li {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 5px;
+  padding: 2px 12px;
+  background: none;
+  white-space: nowrap;
+}
+
+.ixk-today li:first-child {
+  padding-left: 0;
+}
+
+.ixk-today li + li {
+  border-left: 1px solid var(--line);
+}
+
+.ixk-today-label {
+  font-size: 12px;
+}
+
+.ixk-today b {
+  font-size: 14px;
+}
+
+.ixk-today-diff {
+  font-size: 11.5px;
+}
+
+@media (max-width: 740px) {
+  .ixk-today {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-snap-type: none;
+  }
+
+  .ixk-today li {
+    min-width: 0;
+    padding: 2px 10px;
+  }
+
+  .ixk-today b {
+    font-size: 13.5px;
+  }
+}
+/* 현재가 굴러가기 정렬 수정 (2026-11-24 사용자 지적 "숫자랑 문자 정렬이 안 맞음").
+   숫자 칸은 overflow hidden 상자라 기준선이 상자 아래 끝으로 잡혀 쉼표, "원"보다 떠 보였다.
+   모든 글자(숫자 칸, 쉼표, 원)를 같은 1.25em 줄 상자에 넣고 위 끝을 맞춘다 */
+.odo {
+  display: inline-flex;
+  align-items: flex-start;
+  height: 1.25em;
+  line-height: 1.25em;
+  vertical-align: top;
+  overflow: hidden;
+}
+
+.odo > span {
+  display: inline-block;
+  height: 1.25em;
+  line-height: 1.25em;
+}
+
+.odo-col > span {
+  display: block;
+  line-height: 1.25em;
+}
+
+.sd-live b {
+  display: inline-block;
+  line-height: 1.25em;
+}
+/* 글자만 있는 단추, 링크에는 늘 밑줄 (2026-11-24 사용자 지시 "글자 버튼에는 밑줄").
+   테두리나 바탕이 없는 누름 요소는 밑줄이 없으면 눌리는 것인지 알 수 없다 */
+.ixk-ind-head button,
+.oops-alt a b,
+.oops-foot a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+.ixk-ind-head button:hover,
+.oops-alt a:hover b,
+.oops-foot a:hover {
+  text-decoration-thickness: 2px;
+}

@@ -79,6 +79,15 @@ function SiteFooter() {
         본 서비스는 투자자문이나 투자권유를 제공하지 않습니다. 투자 판단과 그 결과는
         이용자 본인에게 귀속됩니다.
       </p>
+      {/* 차트 라이브러리 출처 표기(라이선스 조건: 고지문 + tradingview.com 링크). 차트 안 로고(attributionLogo)를
+          끈 대신 여기서 표기한다(2026-11-24 사용자 결정). 이 줄을 지우면 차트 로고를 다시 켜야 한다 */}
+      <p className="footer-note footer-note--faint">
+        차트:{" "}
+        <a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer">
+          TradingView Lightweight Charts™
+        </a>{" "}
+        Copyright (c) TradingView, Inc.
+      </p>
     </footer>
   );
 }
