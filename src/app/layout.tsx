@@ -6,6 +6,7 @@ import Link from "next/link";
 import TopNav from "../components/TopNav";
 import VisitTracker from "../components/VisitTracker";
 import TabBar from "../components/TabBar";
+import ScrollReveal from "../components/ScrollReveal";
 import {
   GOOGLE_VERIFICATION,
   NAVER_VERIFICATION,
@@ -129,6 +130,7 @@ export default function RootLayout({
       <body>
         <Header />
         <main>{children}</main>
+        <ScrollReveal />
         <TabBar />
         {/*
           방문 한 줄을 우리 page_view 표에 적는다. 유입 경로를 보려면 이게 있어야 한다 —

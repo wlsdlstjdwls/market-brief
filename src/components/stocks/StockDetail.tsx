@@ -3,6 +3,8 @@ import { StockDisclaimer } from "../StockWeekView";
 import Term from "../Term";
 import StockCharts from "./StockCharts";
 import DivJump from "./DivJump";
+import LiveQuote from "./LiveQuote";
+import ExternalIcon from "../ExternalIcon";
 import { classifyDividends, dividendYears, payCycle } from "../../lib/dividends";
 import type { getStockDetail } from "../../lib/stock-queries";
 import {
@@ -262,10 +264,13 @@ export default function StockDetail({
           <h1 className="page-title">{s.name}</h1>
           <span className="masthead-meta">{s.code}</span>
         </div>
+        <LiveQuote code={s.code} cur={s.cur} from={n.price} />
         <div className="sd-price">
           <b>{fmtPrice(n.price, s.cur)}</b>
           {/* 장중에 돌린 회차면 확정 종가가 아니다. 그 시점을 주가 바로 옆에 적는다 */}
           {n.asof ? <span className="sd-asof">({n.asof})</span> : null}
+          {/* 위 현재가(LiveQuote)와 기준이 다르다. 이 값은 주간 수집 시점 주가다 */}
+          {n.date ? <span className="sd-asof">{n.date.slice(5).replace("-", ".")} 수집</span> : null}
           <ul>
             {moves.map(([label, v]) => (
               <li key={label}>
@@ -369,6 +374,8 @@ export default function StockDetail({
           <CompareTable stock={s} />
         </div>
       </section>
+
+      <StockNews s={s} />
 
       {s.disc?.length ? (
         <section className="sec">
@@ -692,5 +699,58 @@ function SchedSummary({ s }: { s: Stock }) {
       )}
       <p className="stk-note">과거 발표 패턴으로 추정한 날짜입니다. 확정 일정이 아닙니다.</p>
     </div>
+  );
+}
+
+/** 처음에 펼쳐 두는 뉴스 수. 나머지는 접어 둔다 */
+const NEWS_OPEN = 4;
+
+/**
+ * 최근 종목 뉴스(원고 `종목뉴스.md`, 30일). 적재는 `scripts/stock-news.ts`, 규칙은 `src/lib/stock-news.ts`.
+ * 호재/악재 꼬리표, 목표가, 추천 문장은 적재 때 이미 뺐다. 기사 링크는 매체명만 보인다.
+ */
+function StockNews({ s }: { s: Stock }) {
+  const items = s.news ?? [];
+  if (!items.length) return null;
+  const row = (n: (typeof items)[number], i: number) => (
+    <li key={`${n.d}-${n.s}-${i}`}>
+      <p className="sd-news-meta">
+        {n.d.slice(5).replace("-", ".")} {n.s === "am" ? "아침" : "마감"}
+      </p>
+      <div className="sd-news-body">
+        {n.title ? <p className="sd-news-title">{n.title}</p> : null}
+        <p className="sd-news-text">{n.text}</p>
+        {n.src.length ? (
+          <p className="sd-news-src">
+            {n.src.map((l) => (
+              <a key={l.url} className="source-chip" href={l.url} target="_blank" rel="noopener noreferrer nofollow">
+                {l.label}
+                <ExternalIcon />
+              </a>
+            ))}
+          </p>
+        ) : null}
+      </div>
+    </li>
+  );
+  return (
+    <section className="sec" id="sd-news">
+      <div className="sec-gutter">
+        <p className="sec-label">최근 뉴스</p>
+        <p className="sec-note">30일, 사실만 추렸습니다</p>
+      </div>
+      <div className="sec-body">
+        <ul className="sd-news">{items.slice(0, NEWS_OPEN).map(row)}</ul>
+        {items.length > NEWS_OPEN ? (
+          <details className="sd-news-more">
+            <summary>이전 뉴스 {items.length - NEWS_OPEN}건 더 보기</summary>
+            <ul className="sd-news">{items.slice(NEWS_OPEN).map((n, i) => row(n, i + NEWS_OPEN))}</ul>
+          </details>
+        ) : null}
+        <p className="stk-note">
+          더 브리핑 원고의 종목 뉴스에서 목표주가, 추천, 호재/악재 판단을 빼고 사실만 옮겼습니다. 매체명을 누르면 원문으로 갑니다.
+        </p>
+      </div>
+    </section>
   );
 }

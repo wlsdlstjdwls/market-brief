@@ -16,6 +16,7 @@
  */
 
 /** 화면에 실을 분기 한 줄. 단위는 원(KRW)이고 화면에서 억원으로 바꾼다. */
+import type { StockNewsItem } from "./stock-news";
 import type { DivEvent } from "./dividends";
 
 export type StockPeriod = {
@@ -133,6 +134,11 @@ export type Stock = {
    * 분기 몫과 특별배당(추정)은 `src/lib/dividends.ts`가 가른다. 받기 전 회차는 없다.
    */
   divEvents?: DivEvent[] | null;
+  /**
+   * 최근 종목 뉴스(원고 `종목뉴스.md`, 30일). `scripts/stock-news.ts`가 따로 붙인다.
+   * 추천, 목표가 문장과 호재/악재 꼬리표는 빼고 넣는다(`src/lib/stock-news.ts`).
+   */
+  news?: StockNewsItem[] | null;
   /** 최근 1년 주요 공시. 정기보고서는 뺀다(분기마다 같은 제목이라 정보가 없다) */
   disc: Disclosure[];
   /** 실적 발표 패턴. nextExpected 는 추정값이다 */
@@ -188,7 +194,7 @@ export function knownReceipts(s: Pick<Stock, "disc" | "patch">): string[] {
  */
 export function applyPatch(
   fresh: Stock,
-  prev: Pick<Stock, "sector" | "disc" | "patch" | "divEvents">,
+  prev: Pick<Stock, "sector" | "disc" | "patch" | "divEvents" | "news">,
   patch: StockPatch,
 ): Stock {
   const seen = [...new Set([...knownReceipts(prev), ...patch.seen])];
@@ -197,6 +203,7 @@ export function applyPatch(
     ...fresh,
     sector: prev.sector,
     divEvents: fresh.divEvents ?? prev.divEvents ?? null,
+    news: fresh.news ?? prev.news ?? null,
     patch: { on: patch.on, titles: patch.titles, seen },
   };
 }

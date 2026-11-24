@@ -14,7 +14,7 @@ import { scan } from "./guard";
 import { isRegistryName } from "./registry";
 import { SESSION_LABEL, type Session } from "./queries";
 import { SITE_NAME, SITE_URL } from "./site";
-import { displayLabel } from "./labels";
+import { displayLabel, expandLines, impactWord } from "./labels";
 
 /** 텔레그램 한 통의 상한은 4096자다. 서식 태그까지 세므로 여유를 둔다. */
 const CHUNK = 3500;
@@ -100,7 +100,9 @@ function cardTitle(t: string): string {
 function impactLine(raw?: string): string {
   const v = (raw ?? "").trim();
   if (!v) return "";
-  return v.startsWith("시장 영향") ? v : `시장 영향 ${v}`;
+  // 등급 말은 화면과 같이 바꿔 보인다(매우 큼 → 매우 높음, labels.ts의 impactWord)
+  if (v.startsWith("시장 영향")) return `시장 영향 ${impactWord(v.replace(/^시장 영향\s*/, ""))}`;
+  return `시장 영향 ${impactWord(v)}`;
 }
 
 /** 묶음 머리. 굵은 가로줄로 덩어리를 가른다 — 카드 제목(굵게)과 한 단계 위로 읽혀야 한다. */
@@ -156,8 +158,9 @@ export function compose(
     seen.add(key);
 
     // 머리에 이미 실은 요약과 같은 줄은 뺀다.
-    const rows = (t.lines ?? [])
-      .map((l) => ({ label: (l?.label ?? "").trim(), text: (l?.text ?? "").trim() }))
+    const rows = expandLines(
+      (t.lines ?? []).map((l) => ({ label: (l?.label ?? "").trim(), text: (l?.text ?? "").trim() })),
+    )
       .filter((l) => l.text && l.text !== summary);
 
     // 제목도 본문도 머리와 같은 카드면 통째로 버린다(헤드라인이 나온 그 카드다).

@@ -221,6 +221,14 @@ jobs:
             echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # 종목 브리핑 상세의 "최근 뉴스"(fin_stock.detail.news). 원고의 종목뉴스.md를 읽는다.
+      # 뉴스 지면 적재와 무관한 별개 경로이고, 실패해도 브리핑 발행은 살아 있어야 해서 실패로 치지 않는다.
+      # 최근 30일을 매번 통째로 다시 만들므로 몇 번 돌아도 결과가 같다.
+      - name: 종목 뉴스 (종목 브리핑 전용)
+        if: steps.source.outputs.found == 'true' && steps.done.outputs.exists != 'true'
+        continue-on-error: true
+        run: npx tsx scripts/stock-news.ts | tee -a "$GITHUB_STEP_SUMMARY"
+
       # 채널에 발행 알림을 보낸다. 헤드라인과 링크까지고 본문은 안 싣는다
       # (scripts/notify-telegram.ts 머리말 참고).
       #

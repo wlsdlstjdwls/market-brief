@@ -19,6 +19,7 @@ import { scan, stripGlobalPriceSentences } from "./guard";
 import { cleanHeading, dedot, type Section } from "./markdown";
 import { cardSources, type SourceLink } from "./sources";
 import { stripMeta, stripMetaTitle } from "./meta";
+import { PLACEHOLDER, splitPair } from "./labels";
 
 export type TopicKind = "news" | "theme" | "sector";
 
@@ -47,7 +48,13 @@ export interface DroppedTopic {
 interface FieldSpec {
   label: string;
   match: RegExp;
+  /**
+   * 원고가 두 값을 ` / `로 이어 쓰는 항목(`- 상승 논리 / 리스크: A / B`)을 줄 둘로 가른다.
+   * 화면에 `A / B`로 뭉쳐 나가고, 한쪽이 비면 `— / B`가 그대로 보였다(2026-11-24).
+   */
+  split?: [string, string];
 }
+
 
 interface TopicSpec {
   kind: TopicKind;
@@ -86,7 +93,7 @@ const TOPIC_SPECS: TopicSpec[] = [
       { label: "발생 원인", match: /발생\s*원인|배경/ },
       { label: "시장 관심도", match: /시장\s*관심도|관심도/ },
       { label: "지속 가능성", match: /지속\s*가능성/ },
-      { label: "논리와 리스크", match: /논리|리스크/ },
+      { label: "논리와 리스크", match: /논리|리스크/, split: ["논리", "리스크"] },
     ],
   },
   /*
@@ -128,8 +135,23 @@ function field(body: string, label: RegExp): string {
 export function impactLevel(raw: string): string {
   const t = cleanHeading(raw).replace(/[(（].*$/, "").trim();
   const m = /(매우\s*큼|매우\s*작음|큼|보통|작음)/.exec(t);
-  return m ? m[1].replace(/\s+/g, " ") : "";
+  if (m) return m[1].replace(/\s+/g, " ");
+  /*
+   * 2026-09-29부터 원고가 이모지만 적는다(`- 영향도: 🔴`). 글자가 없으면 이모지로 읽는다.
+   * 짝은 그 전 원고에 같이 적혀 있던 것(`🔴 매우 큼`, `🟠 큼`, `🟡 보통`)이다.
+   * `⚪→🟡`처럼 바뀐 것을 적으면 마지막 것을 쓴다.
+   */
+  const emoji = [...raw.matchAll(/🔴|🟠|🟡|🟢|⚪/gu)].pop()?.[0];
+  return emoji ? (IMPACT_EMOJI[emoji] ?? "") : "";
 }
+
+const IMPACT_EMOJI: Record<string, string> = {
+  "🔴": "매우 큼",
+  "🟠": "큼",
+  "🟡": "보통",
+  "🟢": "작음",
+  "⚪": "작음",
+};
 
 const dirty = (t: string) => t === "" || scan(t).violations.length > 0;
 const matchesOf = (t: string) =>
@@ -204,11 +226,17 @@ function collect(
     // 작성 메모(`(검색 요약)`, `… 수치 미확인`)를 걷어낸다. 제목이 통째로 메모면 카드도 버린다.
     const title = stripMetaTitle(spec.title ? spec.title(raw, b.source) : raw);
 
-    const values = spec.fields.map((f) => ({
-      label: f.label,
+    const values = spec.fields.flatMap((f): TopicLine[] => {
       // 해외 기업 시세 문장은 그 문장만 뺀다. 카드 제목에는 쓰지 않는다(제목은 통째로 판정).
-      text: stripGlobalPriceSentences(stripMeta(dedot(field(b.body, f.match)))),
-    }));
+      const text = stripGlobalPriceSentences(stripMeta(dedot(field(b.body, f.match))));
+      const pair = f.split && splitPair(text);
+      if (f.split && pair)
+        return [
+          { label: f.split[0], text: pair[0] },
+          { label: f.split[1], text: pair[1] },
+        ];
+      return [{ label: f.label, text: PLACEHOLDER.test(text) ? "" : text }];
+    });
     const lead = values[0];
     if (!title || !lead.text) continue; // 이 형식의 카드가 아니거나, 메모뿐인 카드다
     if (seen.has(title)) continue;

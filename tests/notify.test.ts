@@ -107,13 +107,13 @@ test("영향도는 제목과 다른 줄에, 무엇이 큰지를 밝혀 적는다
     { kind: "news", title: "FOMC 앞두고 관망", impact: "큼", lines: [{ label: "무슨 일인가", text: "관망세가 짙어졌다" }] },
   ]);
   const body = whole(chunks);
-  assert.ok(body.includes("<b>1. FOMC 앞두고 관망</b>\n<code>시장 영향 큼</code>"), body);
+  assert.ok(body.includes("<b>1. FOMC 앞두고 관망</b>\n<code>시장 영향 높음</code>"), body);
   assert.ok(!body.includes("관망</b> <code>"), "제목 줄에 이어 붙이지 않는다");
 });
 
 test("이미 '시장 영향'으로 시작하면 두 번 붙이지 않는다", () => {
   const { chunks } = compose(base, [card("반도체 수출 증가")]);
-  assert.ok(whole(chunks).includes("<code>시장 영향 큼</code>"));
+  assert.ok(whole(chunks).includes("<code>시장 영향 높음</code>"));
   assert.ok(!whole(chunks).includes("시장 영향 시장 영향"));
 });
 

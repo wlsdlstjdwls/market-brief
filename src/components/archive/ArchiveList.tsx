@@ -25,17 +25,35 @@ export default function ArchiveList({ items }: { items: ArchiveItem[] }) {
   const [q, setQ] = useState("");
   const query = useDeferredValue(q.trim().toLowerCase());
 
+  /*
+   * 연도, 달로 골라 본다(2026-11-24 사용자 지시, "모두 나오는 게 아니라 년도별로").
+   * 처음에는 최신 연도의 최신 달만 보인다. 검색어가 있으면 연도, 달 선택을 무시하고 전체에서 찾는다.
+   * 선택은 주소에 올리지 않는다(ISR 유지, 검색과 같은 이유).
+   */
+  const years = useMemo(() => [...new Set(items.map((b) => b.tradeDate.slice(0, 4)))], [items]);
+  const [year, setYear] = useState<string | null>(null);
+  const curYear = year ?? years[0] ?? "";
+  const monthsOfYear = useMemo(
+    () => [...new Set(items.filter((b) => b.tradeDate.startsWith(curYear)).map((b) => b.tradeDate.slice(0, 7)))],
+    [items, curYear],
+  );
+  // null = 그 해의 최신 달, "all" = 그 해 전체
+  const [month, setMonth] = useState<string | null>(null);
+  const curMonth = month ?? monthsOfYear[0] ?? "";
+
   const months = useMemo(() => {
     const hit = query
       ? items.filter((b) => b.headline.toLowerCase().includes(query) || b.tradeDate.includes(query))
-      : items;
+      : items.filter((b) =>
+          curMonth === "all" ? b.tradeDate.startsWith(curYear) : b.tradeDate.startsWith(curMonth),
+        );
     const out = new Map<string, ArchiveItem[]>();
     for (const b of hit) {
       const key = b.tradeDate.slice(0, 7);
       out.set(key, [...(out.get(key) ?? []), b]);
     }
     return [...out.entries()];
-  }, [items, query]);
+  }, [items, query, curYear, curMonth]);
 
   const total = months.reduce((n, [, l]) => n + l.length, 0);
 
@@ -49,19 +67,51 @@ export default function ArchiveList({ items }: { items: ArchiveItem[] }) {
           placeholder="헤드라인 검색 (예: 사이드카, FOMC, 환율)"
           aria-label="지난 브리핑 헤드라인 검색"
         />
-        <span className="arc-count" aria-live="polite">
-          {query ? `${total}일 찾음` : `${items.length}일`}
-        </span>
+        {query ? (
+          <span className="arc-count" aria-live="polite">
+            {total}건 찾음
+          </span>
+        ) : null}
       </div>
 
+      {query ? null : (
+        <nav className="arc-filter" aria-label="연도와 달 고르기">
+          <div className="arc-years" role="tablist">
+            {years.map((y) => (
+              <button
+                key={y}
+                type="button"
+                role="tab"
+                aria-selected={y === curYear}
+                onClick={() => {
+                  setYear(y);
+                  setMonth(null);
+                }}
+              >
+                {y}년
+              </button>
+            ))}
+          </div>
+          <div className="arc-months">
+            {monthsOfYear.map((m) => (
+              <button key={m} type="button" aria-pressed={m === curMonth} onClick={() => setMonth(m)}>
+                {Number(m.slice(5))}월
+              </button>
+            ))}
+            <button type="button" aria-pressed={curMonth === "all"} onClick={() => setMonth("all")}>
+              {curYear}년 전체
+            </button>
+          </div>
+        </nav>
+      )}
+
       {months.length ? (
-        months.map(([month, list]) => (
-          <section key={month} className="sec arc-month">
+        months.map(([m, list]) => (
+          <section key={m} className="sec arc-month">
             <div className="sec-gutter">
               <h2 className="sec-label">
-                {month.slice(0, 4)}년 {Number(month.slice(5))}월
+                {m.slice(0, 4)}년 {Number(m.slice(5))}월
               </h2>
-              <p className="sec-note">{list.length}일</p>
             </div>
             <ol className="arc-list">
               {list.map((b) => {

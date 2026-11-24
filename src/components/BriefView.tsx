@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { renderMarkdown, renderText } from "../lib/render";
 import { weekdayKo } from "../lib/date";
-import { displayLabel } from "../lib/labels";
+import { displayLabel, expandLines, impactWord } from "../lib/labels";
 import { SESSION_LABEL, type Session } from "../lib/queries";
+import BriefIndexSpy from "./BriefIndexSpy";
+import ExternalIcon from "./ExternalIcon";
 import SessionTabs from "./SessionTabs";
 import Shell from "./Shell";
 
@@ -95,10 +97,13 @@ function Section({
   note,
   link,
   first,
+  mark,
   children,
 }: {
   id: string;
   ord: number;
+  /** 섹션 뒤에 까는 영문 워터마크 */
+  mark?: string;
   label: string;
   note?: string;
   link?: { href: string; text: string };
@@ -106,11 +111,13 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className={first ? "sec sec--first" : "sec"}>
-      <div className="sec-gutter">
-        <h2 className="sec-label">
-          <span className="sec-ord">{String(ord).padStart(2, "0")}</span> {label}
-        </h2>
+    <section id={id} className={first ? "sec sec--first sec--mark" : "sec sec--mark"}>
+      {/*
+        섹션 머리는 번호 대신 영문 워터마크(시안 R1, 2026-11-24). 섹션 번호와 카드 번호가 같은 검은 칸이라
+        중메뉴와 소메뉴가 안 갈린다는 지적이었다. 번호는 카드에만 남는다.
+      */}
+      <div className="sec-gutter" data-mark={mark ?? ""} data-ord={ord}>
+        <h2 className="sec-label">{label}</h2>
         {note ? <p className="sec-note">{note}</p> : null}
         {link ? (
           <Link href={link.href} className="sec-link">
@@ -144,12 +151,17 @@ function TopicCard({
 }) {
   return (
     <article className="topic" id={id}>
-      {/* 번호와 배지를 제목 위 한 줄에 따로 둔다. 제목 옆에 붙이면 제목의 일부로 읽힌다. */}
-      <div className="topic-head">
+      {/* 영향도 배지는 제목 위 제 줄. 제목 옆에 붙이면 제목의 일부로 읽힌다 */}
+      {impact ? (
+        <div className="topic-head">
+          <ImpactMeter level={impact} />
+        </div>
+      ) : null}
+      {/* 번호는 제목 바로 앞(2026-11-24 "번호 옆에 제목이 나와야"). 본문은 제목 시작점에 맞춰 들인다 */}
+      <div className="topic-titlerow">
         <span className="topic-no">{String(ord).padStart(2, "0")}</span>
-        {impact ? <ImpactMeter level={impact} /> : null}
+        <h3 className="topic-title">{renderText(cardTitle(title))}</h3>
       </div>
-      <h3 className="topic-title">{renderText(cardTitle(title))}</h3>
       <TopicLines lines={lines} />
       <SourceList links={sources} />
     </article>
@@ -204,7 +216,7 @@ function TopicLines({ lines }: { lines: Array<{ label: string; text: string }> }
  * sources.ts가 이미 매체명만 남기고 URL까지 검사하지만, 화면에서도 제목을 쓰지 않는다.
  * 외부로 나가는 링크라 `rel`을 박는다.
  */
-function SourceList({ links, label = "기사" }: { links: SourceLink[]; label?: string }) {
+function SourceList({ links, label = "원문" }: { links: SourceLink[]; label?: string }) {
   if (!links.length) return null;
   // 같은 매체의 다른 기사가 여러 건이면 이름이 똑같이 찍힌다. 두 번째부터 번호를 단다.
   const seen = new Map<string, number>();
@@ -223,6 +235,7 @@ function SourceList({ links, label = "기사" }: { links: SourceLink[]; label?: 
             rel="noopener noreferrer nofollow"
           >
             {renderText(n > 1 ? `${l.label} ${n}` : l.label)}
+            <ExternalIcon />
           </a>
         );
       })}
@@ -256,7 +269,7 @@ function ImpactMeter({ level }: { level: string }) {
           />
         ))}
       </span>
-      시장 영향 {level}
+      시장 영향 {impactWord(level)}
     </span>
   );
 }
@@ -278,7 +291,7 @@ function toSources(v: unknown): SourceLink[] {
   });
 }
 
-function toLines(v: unknown): Array<{ label: string; text: string }> {
+function rawLines(v: unknown): Array<{ label: string; text: string }> {
   if (!Array.isArray(v)) return [];
   return v.flatMap((x) => {
     if (!x || typeof x !== "object") return [];
@@ -288,6 +301,33 @@ function toLines(v: unknown): Array<{ label: string; text: string }> {
     return [{ label, text }];
   });
 }
+
+/** DB 줄을 화면용으로. 옛 회차의 `논리와 리스크: A / B`도 두 줄로 가른다. */
+function toLines(v: unknown): Array<{ label: string; text: string }> {
+  return expandLines(rawLines(v));
+}
+
+/** 색인을 종류별로 묶는다. 들어온 순서(뉴스 분석, 핵심 테마, 업종 관점)를 지킨다 */
+function indexGroups<T extends { kind: string }>(items: T[]) {
+  const groups: Array<{ kind: string; items: T[] }> = [];
+  for (const it of items) {
+    const g = groups.find((x) => x.kind === it.kind);
+    if (g) g.items.push(it);
+    else groups.push({ kind: it.kind, items: [it] });
+  }
+  return groups;
+}
+
+/** 섹션 워터마크(시안 R1). 블록 id → 영문 */
+const SECTION_MARK: Record<string, string> = {
+  news: "NEWS",
+  themes: "THEMES",
+  sectors: "SECTORS",
+  domestic: "KOREA",
+  global: "GLOBAL",
+  sources: "SOURCES",
+  recent: "ARCHIVE",
+};
 
 const TOPIC_BLOCKS: Array<{ kind: string; id: string; label: string }> = [
   { kind: "news", id: "news", label: "뉴스 분석" },
@@ -448,69 +488,88 @@ export default function BriefView({
 
   return (
     <Shell>
-      <header className="masthead">
-        <div className="masthead-row">
-          <span className="date-xl">{dotted(brief.tradeDate)}</span>
-          {day ? <span className="masthead-meta">{day}요일</span> : null}
-        </div>
-
-        {/* 켜진 탭은 `<html data-session>`을 보고 CSS가 고른다. SessionTabs 주석 참고 */}
-        <SessionTabs basePath={basePath} sessions={sessions} inline={inlineSessions} />
-
-        {/* 회차와 게시 시각만 찍는다. 원고 작성 시각은 사용자 지시로 뺐다(2026-09-17).
-            값은 daily_brief.written_at에 계속 쌓이므로 되살리려면 여기만 되돌리면 된다. */}
-        <p className="edition">
-          {/* 회차 스위치가 있으면 켜진 칸이 회차 이름이라 여기서 다시 적지 않는다 */}
-          {sessions.length > 1 ? null : <span>{SESSION_LABEL[brief.session]}</span>}
-          {posted ? <span>{posted}</span> : null}
-        </p>
-
-        {top?.impact ? (
-          <div className="top-impact">
-            <ImpactMeter level={top.impact} />
+      {/*
+        넓은 화면(1100px 이상)은 본문 + 오른쪽 고정 색인 2단이다. 한 단일 때 본문이 왼쪽 640px만 쓰고
+        오른쪽 절반이 비어 있었다(2026-11-24 진단). 좁은 화면은 지금처럼 마스트헤드 아래 한 단으로 앉는다.
+        자리 배치는 CSS grid-template-areas가 한다(.brief-layout).
+      */}
+      <div className="brief-layout">
+        <header className="masthead">
+          <div className="masthead-row">
+            <span className="date-xl">{dotted(brief.tradeDate)}</span>
+            {day ? <span className="masthead-meta">{day}요일</span> : null}
           </div>
-        ) : null}
-        <h1 className="headline">{renderText(brief.headline)}</h1>
-        {top ? (
-          <div className="top-story">
-            <TopicLines lines={top.lines} />
-            <SourceList links={top.sources} />
-          </div>
-        ) : null}
-      </header>
 
-      {index.length > 1 ? (
-        <nav className="brief-index" aria-label="이 회차 한눈에">
-          <p className="brief-index-title">이 회차 한눈에</p>
-          <ol>
-            {index.map((it) => (
-              <li key={it.href}>
-                <a href={it.href}>
-                  <span className="brief-index-kind">{it.kind}</span>
-                  <span className="brief-index-text">{renderText(it.title)}</span>
-                  {it.impact === "매우 큼" || it.impact === "큼" ? (
-                    <span className="brief-index-hot">영향 {it.impact}</span>
-                  ) : null}
-                </a>
-              </li>
+          {/* 켜진 탭은 `<html data-session>`을 보고 CSS가 고른다. SessionTabs 주석 참고 */}
+          <SessionTabs basePath={basePath} sessions={sessions} inline={inlineSessions} />
+
+          {/* 회차와 게시 시각만 찍는다. 원고 작성 시각은 사용자 지시로 뺐다(2026-09-17).
+              값은 daily_brief.written_at에 계속 쌓이므로 되살리려면 여기만 되돌리면 된다. */}
+          <p className="edition">
+            {/* 회차 스위치가 있으면 켜진 칸이 회차 이름이라 여기서 다시 적지 않는다 */}
+            {sessions.length > 1 ? null : <span>{SESSION_LABEL[brief.session]}</span>}
+            {posted ? <span>{posted}</span> : null}
+          </p>
+
+          {top?.impact ? (
+            <div className="top-impact">
+              <ImpactMeter level={top.impact} />
+            </div>
+          ) : null}
+          <h1 className="headline">{renderText(brief.headline)}</h1>
+          {top ? (
+            <div className="top-story">
+              <TopicLines lines={top.lines} />
+              <SourceList links={top.sources} />
+            </div>
+          ) : null}
+        </header>
+
+        {index.length > 1 ? (
+          <nav className="brief-index" id={`${idPrefix}brief-index`} aria-label="이 회차 한눈에">
+            <BriefIndexSpy navId={`${idPrefix}brief-index`} />
+            <p className="brief-index-title">이 회차 한눈에</p>
+            {/* 종류(뉴스 분석, 핵심 테마)별로 묶는다. 줄마다 종류를 적으면 색인이 두 배로 길어져
+                오른쪽 고정 칸 안에 스크롤이 생겼다(2026-11-24 지적). 번호는 묶음마다 01부터 다시 센다(카드 번호와 맞춘다) */}
+            {indexGroups(index).map((g) => (
+              <div className="brief-index-group" key={g.kind}>
+                <p className="brief-index-kind">{g.kind}</p>
+                <ol>
+                  {g.items.map((it) => (
+                    <li key={it.href}>
+                      <a href={it.href} title={it.title}>
+                        <span className="brief-index-text">{renderText(it.title)}</span>
+                        {it.impact === "매우 큼" || it.impact === "큼" ? (
+                          <span className={it.impact === "매우 큼" ? "brief-index-hot brief-index-hot--max" : "brief-index-hot"}>
+                            {impactWord(it.impact)}
+                          </span>
+                        ) : null}
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+              </div>
             ))}
-          </ol>
-        </nav>
-      ) : null}
+          </nav>
+        ) : null}
 
-      {blocks.map((b, i) => (
-        <Section
-          key={b.id}
-          id={`${idPrefix}${b.id}`}
-          ord={i + 1}
-          label={b.label}
-          note={b.note}
-          link={b.link}
-          first={i === 0}
-        >
-          {b.node}
-        </Section>
-      ))}
+        <div className="brief-body">
+          {blocks.map((b, i) => (
+            <Section
+              key={b.id}
+              id={`${idPrefix}${b.id}`}
+              ord={i + 1}
+              label={b.label}
+              note={b.note}
+              link={b.link}
+              first={i === 0}
+              mark={SECTION_MARK[b.id]}
+            >
+              {b.node}
+            </Section>
+          ))}
+        </div>
+      </div>
     </Shell>
   );
 }

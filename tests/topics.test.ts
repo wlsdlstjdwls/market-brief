@@ -112,6 +112,10 @@ test("테마 카드는 발생 원인·관심도·지속성·리스크를 담는�
 test("영향도에서 이모지·괄호를 걷어낸다", () => {
   assert.equal(impactLevel("🔴 매우 큼"), "매우 큼");
   assert.equal(impactLevel("🟡 보통(추정)"), "보통");
+  // 2026-09-29부터 이모지만 적는다
+  assert.equal(impactLevel("🔴"), "매우 큼");
+  assert.equal(impactLevel("🟠"), "큼");
+  assert.equal(impactLevel("⚪→🟡"), "보통");
   assert.equal(impactLevel(""), "");
   const canada = topics.list.find((t) => t.title.includes("캐나다"));
   assert.equal(canada?.impact, "보통");
@@ -127,3 +131,44 @@ test("사전에 영문만 있는 종목의 한글 표기도 잡는다", () => {
     );
 });
 
+
+// 2026-11-24: 쟁점이 `A / B`로 뭉쳐 나가고 빈 쪽이 `— / B`로 보였다.
+import { expandLines, splitPair } from "../src/lib/labels";
+import { paragraphs } from "../src/lib/markdown";
+
+test("쟁점: 논리 / 리스크를 두 줄로 가르고 빈 자리 표시는 버린다", () => {
+  assert.deepEqual(splitPair("공급망 안정 기대 / 12/1 하원 질의"), ["공급망 안정 기대", "12/1 하원 질의"]);
+  assert.deepEqual(splitPair("— / 동남아 경유 GPU 수요 위축"), ["", "동남아 경유 GPU 수요 위축"]);
+  assert.equal(splitPair("D램/HBM 가격"), null);
+  assert.deepEqual(
+    expandLines([
+      { label: "발생 원인", text: "배경" },
+      { label: "논리와 리스크", text: "— / 중국 저가 수주" },
+    ]),
+    [
+      { label: "발생 원인", text: "배경" },
+      { label: "리스크", text: "중국 저가 수주" },
+    ],
+  );
+});
+
+test("적재: 테마 카드의 논리와 리스크가 두 줄로 들어간다", () => {
+  const md = `# r
+
+## 섹션 5. 오늘의 핵심 테마
+
+### 유가 하락 — 항공 비용 절감
+- 발생 원인: 리비아 송유관 재가동, 공급 과잉
+- 상승 논리 / 리스크: 연료비 절감 / 중동 전쟁 재격화 시 반전
+`;
+  const [t] = extractTopics(splitSections(md));
+  assert.deepEqual(
+    t.lines.map((l) => l.label),
+    ["발생 원인", "논리", "리스크"],
+  );
+});
+
+test("산문: 괄호 꼬리가 붙은 표 제목만 남은 문단은 버린다", () => {
+  const out = paragraphs("**실적 컨센서스 변화** (최근 1개월)\n\n본문 문장이다.");
+  assert.deepEqual(out, ["본문 문장이다."]);
+});

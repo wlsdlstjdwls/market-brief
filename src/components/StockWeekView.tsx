@@ -2,6 +2,7 @@ import Link from "next/link";
 import { marked } from "marked";
 import Shell from "./Shell";
 import StockExplorer from "./stocks/StockExplorer";
+import IndexCards from "./market/IndexCards";
 import type { FinWeek } from "../lib/stock-queries";
 import { weekdayKo } from "../lib/date";
 
@@ -57,6 +58,9 @@ export function summaryParts(md: string): Array<{ no: string | null; title: stri
     }
     const raw = m[1].trim();
     const num = raw.match(/^(\d+)\.\s*/);
+    // "데이터 한계"는 루틴의 작업 메모다(빠진 분기, PER 왜곡 목록, "웹검색 수치는 쓰지 않았다").
+    // 카드와 표가 이미 흐림, "재무 자료 없음"으로 보여 주므로 독자용 절에서 뺀다(2026-11-24).
+    if (/데이터\s*(한계|제약)|작성\s*(메모|환경)/.test(raw)) continue;
     parts.push({
       no: num ? num[1].padStart(2, "0") : null,
       title: num ? raw.slice(num[0].length) : raw,
@@ -92,7 +96,6 @@ export default function StockWeekView({
   const isLatest = weeks[0] === week.runDate;
 
   const toc: Array<[string, string]> = [
-    ["stx-overview", "한눈에"],
     ["stx-scatter", "실적과 주가"],
     ["stx-list", "종목"],
   ];
@@ -115,6 +118,9 @@ export default function StockWeekView({
         {/* "회차 이후 새 공시 … 토요일 기준입니다" 안내 줄은 2026-11-23 사용자 지시로 지웠다.
             어느 종목이 갱신됐는지는 카드의 "공시 반영" 꼬리표가 알려 준다 */}
         <StockDisclaimer />
+        {/* 지수 카드 다섯 칸(시안 G3). 뉴스 브리핑에서 옮겨 왔다(2026-11-24, 뉴스 지면은 수치를 싣지 않는다).
+            최신 회차에서만 그린다. 지난 회차 화면에 지금 시세가 뜨면 그 주 시장으로 읽힌다 */}
+        {isLatest ? <IndexCards always /> : null}
       </header>
 
       <nav className="stx-toc" aria-label="이 페이지 바로가기">

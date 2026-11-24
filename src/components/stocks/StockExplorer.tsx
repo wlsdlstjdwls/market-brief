@@ -248,7 +248,6 @@ export default function StockExplorer({
 
       {shown.length ? (
         <>
-          <Stats items={shown} />
           <Scatter items={shown} />
 
           <div className="stx-head" id="stx-list">
@@ -416,68 +415,6 @@ function Dropdown({
 
 /* ---------- 요약 숫자 ---------- */
 
-function median(xs: number[]): number | null {
-  if (!xs.length) return null;
-  const s = [...xs].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-}
-
-function Split({ up, down, upLabel, downLabel }: { up: number; down: number; upLabel: string; downLabel: string }) {
-  const total = up + down || 1;
-  return (
-    <>
-      <div className="stx-split" aria-hidden="true">
-        <span className="stx-split-up" style={{ width: `${(up / total) * 100}%` }} />
-        <span className="stx-split-down" style={{ width: `${(down / total) * 100}%` }} />
-      </div>
-      <small>
-        <span className="stk-up">{upLabel} {up}</span>
-        <span className="stk-down">{downLabel} {down}</span>
-      </small>
-    </>
-  );
-}
-
-function Stats({ items }: { items: ExplorerItem[] }) {
-  const opUp = items.filter((s) => (s.opYoy ?? 0) > 0).length;
-  const opDown = items.filter((s) => (s.opYoy ?? 0) < 0).length;
-  const pxUp = items.filter((s) => (s.chg3m ?? 0) > 0).length;
-  const pxDown = items.filter((s) => (s.chg3m ?? 0) < 0).length;
-  const med3m = median(items.map((s) => s.chg3m).filter((v): v is number => v !== null));
-  const medOpm = median(items.map((s) => s.opm).filter((v): v is number => v !== null));
-
-  return (
-    <div className="stx-stats" id="stx-overview">
-      <div className="stx-stat">
-        <span>영업이익 (전년 동기 대비)</span>
-        <b>
-          {opUp}
-          <i>/{items.length}</i>
-        </b>
-        <Split up={opUp} down={opDown} upLabel="증가" downLabel="감소" />
-      </div>
-      <div className="stx-stat">
-        <span>주가 3개월</span>
-        <b>
-          {pxUp}
-          <i>/{items.length}</i>
-        </b>
-        <Split up={pxUp} down={pxDown} upLabel="상승" downLabel="하락" />
-      </div>
-      <div className="stx-stat">
-        <span>3개월 등락 중앙값</span>
-        <b className={toneOf(med3m) ? `stk-${toneOf(med3m)}` : undefined}>{fmtChange(med3m)}</b>
-        <small>절반이 이보다 높고 절반이 낮다</small>
-      </div>
-      <div className="stx-stat">
-        <span>영업이익률 중앙값</span>
-        <b>{fmtRatio(medOpm)}</b>
-        <small>최근 분기 기준</small>
-      </div>
-    </div>
-  );
-}
 
 /* ---------- 실적과 주가 산점도 ---------- */
 
@@ -599,7 +536,7 @@ function Scatter({ items }: { items: ExplorerItem[] }) {
             3개월 주가
           </text>
 
-          {pts.map((p) => {
+          {pts.map((p, i) => {
             const cx = x(p.opYoy!);
             const cy = y(p.chg3m!);
             const on = hover?.code === p.code;
@@ -621,6 +558,7 @@ function Scatter({ items }: { items: ExplorerItem[] }) {
                   cx={cx}
                   cy={cy}
                   r={on ? 6.5 : 5}
+                  style={{ animationDelay: `${Math.min(i * 25, 900)}ms` }}
                 />
                 {labels.has(p.code) ? (
                   <text
@@ -655,71 +593,79 @@ function Scatter({ items }: { items: ExplorerItem[] }) {
           </div>
         ) : null}
       </div>
-      <Quadrants pts={pts} onHover={setHover} />
+      <Quadrants pts={pts} hover={hover?.code ?? null} onHover={setHover} />
       </div>
     </figure>
   );
 }
 
 /**
- * 산점도 옆 사분면 목록. 점 위의 이름표는 겹치면 빠지므로(바깥쪽 8개만) 어느 칸에 누가
- * 있는지를 글로 한 번 더 적는다. 넓은 화면에서 산점도 오른쪽 빈자리를 쓴다.
- * 이름에 올리면 산점도의 그 점이 커진다.
+ * 산점도 옆 사분면 매트릭스 (2026-11-24, 사분면 시안 Q1 + 배치 시안 L2).
+ * 산점도와 같은 방향(오른쪽 = 실적 증가, 위 = 주가 상승)으로 네 칸을 놓고, 칸마다 종목 수와
+ * 종목 칩(3개월 등락)을 **전부** 보여 준다. 예전 "외 N" 접기는 없앴다 — 넘치면 칸 안에서 스크롤한다.
+ * 종목이 가장 많은 칸은 머스터드 테두리로 짚는다.
+ * 칩과 산점도의 점은 서로 이어져 있다: 칩에 올리면 점이 커지고 툴팁이 뜨고, 점에 올리면 칩이 검게 뒤집힌다.
  */
 const QUADS: Array<{ key: string; label: string; test: (s: ExplorerItem) => boolean }> = [
-  { key: "uu", label: "실적 증가, 주가 상승", test: (s) => s.opYoy! >= 0 && s.chg3m! >= 0 },
-  { key: "ud", label: "실적 증가, 주가 하락", test: (s) => s.opYoy! >= 0 && s.chg3m! < 0 },
   { key: "du", label: "실적 감소, 주가 상승", test: (s) => s.opYoy! < 0 && s.chg3m! >= 0 },
+  { key: "uu", label: "실적 증가, 주가 상승", test: (s) => s.opYoy! >= 0 && s.chg3m! >= 0 },
   { key: "dd", label: "실적 감소, 주가 하락", test: (s) => s.opYoy! < 0 && s.chg3m! < 0 },
+  { key: "ud", label: "실적 증가, 주가 하락", test: (s) => s.opYoy! >= 0 && s.chg3m! < 0 },
 ];
-
-/** 사분면 한 칸에 처음 보여 줄 종목 수. 넘치면 "외 N" 단추로 편다 (2026-11-23 개편) */
-const QUAD_PEEK = 8;
 
 function Quadrants({
   pts,
+  hover,
   onHover,
 }: {
   pts: ExplorerItem[];
+  /** 산점도에서 마우스가 올라간 종목 코드. 그 칩을 뒤집는다 */
+  hover: string | null;
   onHover: (s: ExplorerItem | null) => void;
 }) {
-  // 한 칸에 39종목이 몰리면 휴대폰 한 화면이 이름으로 찬다. 처음에는 몇 개만 보이고 편다
-  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const lists = QUADS.map((q) => pts.filter(q.test).sort((a, b) => b.chg3m! - a.chg3m!));
+  const most = Math.max(...lists.map((l) => l.length));
+  const tile = (i: number) => {
+    const q = QUADS[i];
+    const list = lists[i];
+    return (
+      <div key={q.key} className={`stx-qx-tile${list.length && list.length === most ? " is-most" : ""}`}>
+        <p className="stx-qx-head">
+          <b>{list.length}</b>
+          {q.label}
+        </p>
+        <div className="stx-qx-chips">
+          {list.length ? (
+            list.map((s) => (
+              <Link
+                key={s.code}
+                href={`/stocks/${s.code}`}
+                scroll={false}
+                className={`stx-qx-chip${hover === s.code ? " is-hot" : ""}`}
+                onMouseEnter={() => onHover(s)}
+                onMouseLeave={() => onHover(null)}
+                onFocus={() => onHover(s)}
+                onBlur={() => onHover(null)}
+              >
+                {s.name}
+                <span className={`stk-${toneOf(s.chg3m)}`}>{fmtChange(s.chg3m)}</span>
+              </Link>
+            ))
+          ) : (
+            <span className="stx-tip-faint">없음</span>
+          )}
+        </div>
+      </div>
+    );
+  };
   return (
-    <dl className="stx-quads">
-      {QUADS.map((q) => {
-        const list = pts.filter(q.test);
-        const shown = open[q.key] ? list : list.slice(0, QUAD_PEEK);
-        const rest = list.length - shown.length;
-        return (
-          <div key={q.key} className="stx-quad-row">
-            <dt>
-              {q.label} <em>{list.length}</em>
-            </dt>
-            <dd>
-              {list.length
-                ? shown.map((s) => (
-                    <Link
-                      key={s.code}
-                      href={`/stocks/${s.code}`}
-                      scroll={false}
-                      onMouseEnter={() => onHover(s)}
-                      onMouseLeave={() => onHover(null)}
-                    >
-                      {s.name}
-                    </Link>
-                  ))
-                : <span className="stx-tip-faint">없음</span>}
-              {rest > 0 ? (
-                <button type="button" className="stx-quad-more" onClick={() => setOpen((o) => ({ ...o, [q.key]: true }))}>
-                  외 {rest}
-                </button>
-              ) : null}
-            </dd>
-          </div>
-        );
-      })}
-    </dl>
+    // 축 글자는 두지 않는다. 칸 제목이 "실적 증가, 주가 상승"처럼 방향을 말하고, 세로 축 글자는 좁은 칸에서 거꾸로 읽혔다
+    <div className="stx-qx" aria-label="사분면별 종목">
+      {tile(0)}
+      {tile(1)}
+      {tile(2)}
+      {tile(3)}
+    </div>
   );
 }
 
