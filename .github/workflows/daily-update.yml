@@ -221,6 +221,24 @@ jobs:
             echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # 적재한 날짜 페이지와 홈, 지난 브리핑의 캐시를 바로 버린다(src/app/api/revalidate).
+      # 안 하면 ISR이 첫 방문자에게 옛 판(마감판 없는 날짜 페이지)을 내준다.
+      # 텔레그램 링크가 새 판을 가리키도록 발송보다 먼저 돈다. 무효화한 뒤 한 번씩 불러 미리 구워 둔다.
+      # 실패해도 5분 뒤 ISR이 스스로 따라잡으므로 실패로 치지 않는다.
+      - name: 페이지 캐시 갱신
+        if: steps.source.outputs.found == 'true' && steps.done.outputs.exists != 'true'
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+          D: ${{ steps.date.outputs.trade_date }}
+        run: |
+          if [ -z "$REVALIDATE_SECRET" ]; then echo "::warning::REVALIDATE_SECRET 없음 — 캐시 갱신 생략"; exit 0; fi
+          curl -fsS -X POST -H "Authorization: Bearer $REVALIDATE_SECRET" "https://thebriefing.kr/api/revalidate?date=$D"
+          echo
+          for p in "/brief/$D" "/" "/archive"; do
+            curl -s -o /dev/null -w "$p %{http_code}\n" "https://thebriefing.kr$p"
+          done
+
       # 종목 브리핑 상세의 "최근 뉴스"(fin_stock.detail.news). 원고의 종목뉴스.md를 읽는다.
       # 뉴스 지면 적재와 무관한 별개 경로이고, 실패해도 브리핑 발행은 살아 있어야 해서 실패로 치지 않는다.
       # 최근 30일을 매번 통째로 다시 만들므로 몇 번 돌아도 결과가 같다.

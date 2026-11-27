@@ -589,6 +589,18 @@ secret이 없으면 스크립트가 조용히 끝낸다(exit 0).
 - **날짜 페이지가 `searchParams`를 안 읽는다.** 그날 회차를 **둘 다 구워** 보내고
   브라우저가 고른다. `generateStaticParams`로 발행된 48일치를 미리 굽는다.
 
+### 적재 직후 캐시 갱신 (2026-11-27)
+
+**마감판을 넣어도 첫 방문자는 옛 판을 받았다**(11-26 마감판, 사용자가 "지난 브리핑에서 눌러도 안 나온다").
+ISR은 낡은 판을 먼저 내주고 뒤에서 다시 만든다. 날짜 페이지가 아침에 아침판만으로 구워져 있었고,
+방문자가 적어 그 첫 방문자가 운영자 자신이었다.
+
+→ 워크플로 "페이지 캐시 갱신" step이 적재 직후(텔레그램 발송 전) `POST /api/revalidate?date=…`를 부른다.
+그 날짜 페이지, `/`, `/archive`, `/rss.xml`, `/sitemap.xml`을 무효화하고 한 번씩 불러 구워 둔다.
+인증은 `Authorization: Bearer $REVALIDATE_SECRET`(GitHub secret, Vercel Production env 같은 값).
+실패해도 회차는 살아야 해서 `continue-on-error`다. **손으로 `ingest.ts`를 돌렸으면 이 라우트를 손으로 부른다.**
+브라우저 탭을 오래 열어 둔 경우의 클라이언트 캐시(5분)는 여기서 못 막는다.
+
 ### 탭이 도는 방식
 
 **`<html data-session>` 한 값이 본문과 탭을 같이 뒤집는다.** CSS가 한다(`globals.css`).
